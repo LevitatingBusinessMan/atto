@@ -1,11 +1,15 @@
 #![feature(int_roundings)]
+use std::{io, fs};
+
 use clap::Parser;
 use anyhow;
-use std::{fs, io::{stdout, self}, rc::Rc, ops::Deref};
-use ratatui::{prelude::*, widgets::*};
 
 mod buffer;
+mod handle_event;
+mod model;
 
+use model::Model;
+use handle_event::handle_event;
 use buffer::Buffer;
 
 #[derive(Parser)]
@@ -16,63 +20,60 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let buffers = match args.files {
-        Some(files) => files.iter().map(|f| io::Result::Ok(Buffer {
-            name: f.clone(),
-            content: fs::read(f)?
-        })).collect(),
+        Some(files) => read_files(files),
         None => io::Result::Ok(vec![Buffer::empty()]),
     }?;
 
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
-    
-    terminal.clear()?;
+    let mut terminal = tui::init()?;
 
-    let buffers = Rc::new(buffers);
-    let selected = 0;
+    tui::install_panic_hook();
 
-    loop {
-        terminal.draw(|frame| {
-            let main = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Max(1000), Constraint::Length(1)])
-                .split(frame.size());
+    let mut model = Model::new(buffers);
 
-            frame.render_widget(
-                Paragraph::new(String::from_utf8_lossy(&buffers[selected].content))
-                    .block(Block::default()
-                    .title(buffers[selected].name.clone())
-                    .borders(
-                            Borders::TOP | Borders::RIGHT | Borders::LEFT
-                    )),
-                    main[0]
-            );
-        
-            frame.render_widget(
-                Paragraph::new(
-                    Line::styled(
-                        std::format!(
-                            " {:<} {:>width$} ",
-                            "Welcome to Atto!",
-                            std::format!("[{}]", buffers.iter().map(|b| b.name.clone()).collect::<Vec<String>>().join("|")),
-                            width = main[1].width as usize - "Welcome to Atto!".len() - 3
-                        ),
-                        Style::default()
-                        .add_modifier(Modifier::REVERSED)
-                    )
-                ),
-                main[1]
-            )
-
-        })?;
+    while model.running {
+        terminal.draw(|frame| model.view(frame))?;
+        let mut msg = handle_event(&model)?;
+        while msg.is_some() {
+            msg = model.update(msg.unwrap());
+        }
     }
+
+    tui::restore()?;
 
     Ok(())
 }
 
-fn ui(frame: &mut Frame) {
-    frame.render_widget(
-        Paragraph::new("Hello World!")
-            .block(Block::default().title("Greeting").borders(Borders::ALL)),
-        frame.size(),
-    );
+fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer>> {
+    files.iter().map(|f| Ok(Buffer {
+        name: f.clone(),
+        content: fs::read(f)?
+    })).collect()
+}
+mod tui {
+    use std::{io::stdout, panic};
+    use crossterm::{terminal::{EnterAlternateScreen, enable_raw_mode, LeaveAlternateScreen, disable_raw_mode}, ExecutableCommand};
+    use ratatui::{Terminal, backend::{CrosstermBackend, Backend}};
+
+    pub fn init() -> anyhow::Result<Terminal<impl Backend>> {
+        stdout().execute(EnterAlternateScreen)?;
+        enable_raw_mode()?;
+        let terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+        Ok(terminal)
+    }
+
+    pub fn restore() -> anyhow::Result<()> {
+        stdout().execute(LeaveAlternateScreen)?;
+        disable_raw_mode()?;
+        Ok(())
+    }
+
+    pub fn install_panic_hook() {
+        let original_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |panic_info| {
+            stdout().execute(LeaveAlternateScreen).unwrap();
+            disable_raw_mode().unwrap();
+            original_hook(panic_info);
+        }));
+    }
+
 }
