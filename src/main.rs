@@ -28,6 +28,8 @@ fn main() -> anyhow::Result<()> {
     terminal.clear()?;
 
     let buffers = Rc::new(buffers);
+    let selected = 0;
+
     loop {
         terminal.draw(|frame| {
             let main = Layout::default()
@@ -35,29 +37,25 @@ fn main() -> anyhow::Result<()> {
                 .constraints([Constraint::Max(1000), Constraint::Length(1)])
                 .split(frame.size());
 
-            let buf_layout = Layout::new(
-                Direction::Horizontal,
-                buffers.iter().map(|b| Constraint::Percentage(100_u16.div_floor(buffers.len() as u16)))
-            ).split(main[0]);
-    
-            for (i, buffer) in buffers.deref().iter().enumerate() {
-                frame.render_widget(
-                    Paragraph::new(String::from_utf8_lossy(&buffer.content))
-                        .block(Block::default().title(buffer.name.clone()).borders(
-                            if i == 0 {
-                                Borders::TOP | Borders::RIGHT | Borders::LEFT
-                            } else {
-                                Borders::TOP | Borders::RIGHT
-                            }
-                        )),
-                        buf_layout[i]
-                );
-            }
-
+            frame.render_widget(
+                Paragraph::new(String::from_utf8_lossy(&buffers[selected].content))
+                    .block(Block::default()
+                    .title(buffers[selected].name.clone())
+                    .borders(
+                            Borders::TOP | Borders::RIGHT | Borders::LEFT
+                    )),
+                    main[0]
+            );
+        
             frame.render_widget(
                 Paragraph::new(
                     Line::styled(
-                        std::format!("{:width$}", "Welcome to Atto!", width = main[1].width as usize),
+                        std::format!(
+                            " {:<} {:>width$} ",
+                            "Welcome to Atto!",
+                            std::format!("[{}]", buffers.iter().map(|b| b.name.clone()).collect::<Vec<String>>().join("|")),
+                            width = main[1].width as usize - "Welcome to Atto!".len() - 3
+                        ),
                         Style::default()
                         .add_modifier(Modifier::REVERSED)
                     )
