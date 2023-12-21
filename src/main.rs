@@ -44,10 +44,10 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer>> {
-    files.iter().map(|f| Ok(Buffer {
-        name: f.clone(),
-        content: fs::read(f)?
-    })).collect()
+    files.iter().map(|f| Ok(Buffer::new(
+        f.clone(),
+        fs::read(f)?
+    ))).collect()
 }
 mod tui {
     use std::{io::stdout, panic};
