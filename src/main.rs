@@ -30,7 +30,9 @@ fn main() -> anyhow::Result<()> {
 
     let mut model = Model::new(buffers);
 
+
     while model.running {
+
         terminal.draw(|frame| model.view(frame))?;
         let mut msg = handle_event(&model)?;
         while msg.is_some() {
@@ -51,12 +53,13 @@ fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer>> {
 }
 mod tui {
     use std::{io::stdout, panic};
-    use crossterm::{terminal::{EnterAlternateScreen, enable_raw_mode, LeaveAlternateScreen, disable_raw_mode}, ExecutableCommand};
+    use crossterm::{terminal::{EnterAlternateScreen, enable_raw_mode, LeaveAlternateScreen, disable_raw_mode}, ExecutableCommand, Command, QueueableCommand};
     use ratatui::{Terminal, backend::{CrosstermBackend, Backend}};
 
     pub fn init() -> anyhow::Result<Terminal<impl Backend>> {
         stdout().execute(EnterAlternateScreen)?;
         enable_raw_mode()?;
+        stdout().queue(crossterm::event::EnableMouseCapture)?;
         let terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
         Ok(terminal)
     }
