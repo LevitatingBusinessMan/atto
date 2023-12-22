@@ -57,8 +57,14 @@ impl Model {
                 buffer.content.insert(buffer.position, chr as u8);
                 buffer.move_right();
             },
-            Message::MoveLeft => self.current_buffer_mut().move_left(),
-            Message::MoveRight => self.current_buffer_mut().move_right(),
+            Message::MoveLeft => {
+                self.current_buffer_mut().move_left();
+                self.may_scroll = true;
+            },
+            Message::MoveRight => {
+                self.current_buffer_mut().move_right();
+                self.may_scroll = true;
+            },
             Message::MoveUp => {
                 self.current_buffer_mut().move_up();
                 self.may_scroll = true;
