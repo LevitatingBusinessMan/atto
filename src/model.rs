@@ -191,7 +191,23 @@ impl Model {
 
 fn render_help(f: &mut Frame, area: Rect) {
     f.render_widget(
-        Paragraph::new("Welcome to Atto.\nYou're friendly modern editor.\nHere is a list of shortcuts:\n<enter list of helpful shortcuts>")
+        Paragraph::new(
+r"Welcome to Atto!
+Here is a list of keybinds:
+C-c Copy
+C-x Cut
+C-v Paste
+C-a Select All
+A-a Start
+A-e End
+A-j Right
+A-i Up
+A-f Left
+A-n Down
+C-f Find
+C-e Command
+"
+)
         .block(
             Block::default()
             .title("Help")
