@@ -6,8 +6,10 @@ pub struct Buffer {
     pub content: Vec<u8>,
     pub position: usize,
     pub read_only: bool,
-    /// How far to scrol lit
+    /// How far the buffer is scrolled
     pub top: usize,
+    /// Which column the cursor wants to be in (that's vague I know)
+    pub prefered_col: Option<usize>,
 }
 
 impl Buffer {
@@ -18,6 +20,7 @@ impl Buffer {
             position: 0,
             read_only: false,
             top: 0,
+            prefered_col: None,
         }
     }
 
@@ -28,6 +31,7 @@ impl Buffer {
             position: 0,
             read_only: false,
             top: 0,
+            prefered_col: None,
         }
     }
 
@@ -57,33 +61,36 @@ impl Buffer {
     }
 
     pub fn move_left(&mut self) {
+        self.prefered_col = None;
         self.position = self.position.saturating_sub(1);
     }
     
     pub fn move_right(&mut self) {
+        self.prefered_col = None;
         self.position = cmp::min(self.position + 1, self.content.len());
     }
     
     pub fn move_up(&mut self) {
         let start_of_line = self.start_of_line();
+        let prefered_col = self.prefered_col.unwrap_or(self.position.saturating_sub(start_of_line));
 
         if let Some(start_of_prev_line) = self.start_of_prev_line() {
-            let diff_to_start_of_line = self.position.saturating_sub(start_of_line);
             let previous_line_length = start_of_line.saturating_sub(start_of_prev_line+1);
-            self.position = cmp::min(start_of_prev_line + diff_to_start_of_line, start_of_prev_line + previous_line_length);    
+            self.position = cmp::min(start_of_prev_line + prefered_col, start_of_prev_line + previous_line_length);
+            self.prefered_col = Some(prefered_col);
         } else {
             self.position = start_of_line;
         }
     }
     
     pub fn move_down(&mut self) {
-        let diff_to_start_of_line = self.position.saturating_sub(self.start_of_line());
-        let save_pos = self.position;
+        let prefered_col = self.prefered_col.unwrap_or(self.position.saturating_sub(self.start_of_line()));
         if let Some(start_of_next_line) = self.start_of_next_line() {
             self.position = start_of_next_line;
             let start_of_next_next_line = self.start_of_next_line().unwrap_or(self.content.len());
-            let next_line_length = start_of_next_next_line.saturating_sub(start_of_next_line);
-            self.position = cmp::min(start_of_next_line + diff_to_start_of_line, start_of_next_line + next_line_length);
+            let next_line_length = start_of_next_next_line.saturating_sub(start_of_next_line + 1);
+            self.position = cmp::min(start_of_next_line + prefered_col, start_of_next_line + next_line_length);
+            self.prefered_col = Some(prefered_col);
         } else {
             self.position = self.content.len();
         }
