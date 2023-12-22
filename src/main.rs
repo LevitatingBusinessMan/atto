@@ -70,7 +70,8 @@ mod tui {
 
     pub fn restore() -> anyhow::Result<()> {
         stdout().execute(LeaveAlternateScreen)?;
-        stdout().queue(crossterm::event::PopKeyboardEnhancementFlags)?;
+        stdout().execute(crossterm::event::PopKeyboardEnhancementFlags)?;
+        stdout().execute(crossterm::event::DisableMouseCapture)?;
         disable_raw_mode()?;
         Ok(())
     }
