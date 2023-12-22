@@ -133,13 +133,15 @@ impl Buffer {
 
     pub fn goto_start_of_line(&mut self) {
         self.position = self.start_of_line();
+        self.prefered_col = None;
     }
 
     pub fn goto_end_of_line(&mut self) {
         self.position = match self.start_of_next_line() {
             Some(start_of_next_line) => start_of_next_line - 1,
             None => self.content.len(),
-        }
+        };
+        self.prefered_col = None;
     }
 
 }
