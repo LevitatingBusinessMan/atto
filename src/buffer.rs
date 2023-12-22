@@ -126,4 +126,9 @@ impl Buffer {
         }
         return Some(0);
     }
+
+    pub fn move_word_right(&mut self) {
+        self.position += 5;
+    }
+
 }

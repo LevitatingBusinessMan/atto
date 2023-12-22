@@ -30,10 +30,11 @@ fn main() -> anyhow::Result<()> {
 
     let mut model = Model::new(buffers);
 
+    let mut event_state = handle_event::EventState::default();
 
     while model.running {
         terminal.draw(|frame| model.view(frame))?;
-        let mut msg = handle_event(&model)?;
+        let mut msg = handle_event(&model, &mut event_state)?;
         while msg.is_some() {
             msg = model.update(msg.unwrap());
         }
@@ -52,19 +53,24 @@ fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer>> {
 }
 mod tui {
     use std::{io::stdout, panic};
-    use crossterm::{terminal::{EnterAlternateScreen, enable_raw_mode, LeaveAlternateScreen, disable_raw_mode}, ExecutableCommand, Command, QueueableCommand};
+    use crossterm::{terminal::{EnterAlternateScreen, enable_raw_mode, LeaveAlternateScreen, disable_raw_mode}, ExecutableCommand, Command, QueueableCommand, event::KeyboardEnhancementFlags};
     use ratatui::{Terminal, backend::{CrosstermBackend, Backend}};
 
     pub fn init() -> anyhow::Result<Terminal<impl Backend>> {
         stdout().execute(EnterAlternateScreen)?;
         enable_raw_mode()?;
         stdout().queue(crossterm::event::EnableMouseCapture)?;
+        // https://docs.rs/crossterm/latest/crossterm/event/struct.KeyboardEnhancementFlags.html
+        stdout().queue(crossterm::event::PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES))?;
+        stdout().queue(crossterm::event::PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES))?;
+        stdout().queue(crossterm::event::PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::REPORT_EVENT_TYPES))?;
         let terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
         Ok(terminal)
     }
 
     pub fn restore() -> anyhow::Result<()> {
         stdout().execute(LeaveAlternateScreen)?;
+        stdout().queue(crossterm::event::PopKeyboardEnhancementFlags)?;
         disable_raw_mode()?;
         Ok(())
     }
