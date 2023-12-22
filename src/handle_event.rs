@@ -52,6 +52,8 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                     }
                 },
                 KeyCode::Char('f') => Some(Message::MoveLeft),
+                KeyCode::Char('a') => Some(Message::GotoStartOfLine),
+                KeyCode::Char('e') => Some(Message::GotoEndOfLine),
                 _ => None
             }
         } else if key.modifiers.contains(KeyModifiers::CONTROL) {
@@ -66,7 +68,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
             match key.code {
                 KeyCode::Esc => Some(Message::Escape),
                 KeyCode::Char(char) => Some(Message::InsertChar(char)),
-                KeyCode::Enter => Some(Message::InsertChar('\n')),
+                KeyCode::Enter => Some(Message::Enter),
                 KeyCode::Left => Some(Message::MoveLeft),
                 KeyCode::Right => Some(Message::MoveRight),
                 KeyCode::Up => Some(Message::MoveUp),

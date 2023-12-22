@@ -56,6 +56,7 @@ impl Model {
                 let buffer = self.current_buffer_mut();
                 buffer.content.insert(buffer.position, chr as u8);
                 buffer.move_right();
+                self.may_scroll = true;
             },
             Message::MoveLeft => {
                 self.current_buffer_mut().move_left();
@@ -84,6 +85,9 @@ impl Model {
                 self.current_buffer_mut().move_word_right();
                 self.may_scroll = true;
             },
+            Message::GotoStartOfLine => self.current_buffer_mut().goto_start_of_line(),
+            Message::GotoEndOfLine => self.current_buffer_mut().goto_end_of_line(),
+            Message::Enter => return Some(Message::InsertChar('\n')),
         }
         None
     }
@@ -213,4 +217,7 @@ pub enum Message {
     MoveDown,
     Backspace,
     JumpWordRight,
+    GotoStartOfLine,
+    GotoEndOfLine,
+    Enter,
 }
