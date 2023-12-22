@@ -15,6 +15,10 @@ pub struct Model {
     pub utility: Option<UtilityWindow>,
     /// Where should the cursor be drawn
     pub cursor: (u16, u16),
+    /// Tell the view it may have to scroll
+    /// the buffer because the cursor might've moved 
+    /// out of view; 
+    pub may_scroll: bool,
 }
 
 /// The top right window
@@ -31,6 +35,7 @@ impl Model {
             running: true,
             utility: None,
             cursor: (0,0),
+            may_scroll: false,
         }
     }
 
@@ -54,8 +59,21 @@ impl Model {
             },
             Message::MoveLeft => self.current_buffer_mut().move_left(),
             Message::MoveRight => self.current_buffer_mut().move_right(),
-            Message::MoveUp => self.current_buffer_mut().move_up(),
-            Message::MoveDown => self.current_buffer_mut().move_down(),
+            Message::MoveUp => {
+                self.current_buffer_mut().move_up();
+                self.may_scroll = true;
+            },
+            Message::MoveDown => {
+                self.current_buffer_mut().move_down();
+                self.may_scroll = true;
+            },
+            Message::Backspace => {
+                let cur = self.current_buffer_mut();
+                if cur.position > 0 {
+                    cur.content.remove(cur.position-1);
+                    return Some(Message::MoveLeft);
+                }
+            },
         }
         None
     }
@@ -68,7 +86,7 @@ impl Model {
         return &self.buffers[self.selected];
     }
 
-    pub fn view(&self, f: &mut Frame) {
+    pub fn view(&mut self, f: &mut Frame) {
         let main = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(0), Constraint::Length(1)])
@@ -92,7 +110,25 @@ impl Model {
             .constraints([Constraint::Min(0), Constraint::Max(30), Constraint::Length(scrollbar_width)])
             .split(vertical_middle_split[0])[1];
 
+        // Scroll the buffer if the cursor was moved out of view.
+        {
+            let may_scroll = self.may_scroll;
+            let current_buffer = self.current_buffer_mut();
+            let (_, cursor_y) = current_buffer.cursor_pos();
+            if may_scroll {
+                if cursor_y < current_buffer.top as u16 {
+                    current_buffer.top = cursor_y as usize;
+                } else if cursor_y >= current_buffer.top as u16 + buffer_and_scrollbar[0].height {
+                    let diff = cursor_y - (current_buffer.top as u16 + buffer_and_scrollbar[0].height);
+                    current_buffer.top += diff as usize + 1;
+                }
+            }
+            self.may_scroll = false;
+        }
+
         let current_buffer = self.current_buffer();
+
+        let (cursor_x, cursor_y) = current_buffer.cursor_pos();
 
         f.render_widget(
             Paragraph::new(String::from_utf8_lossy(&current_buffer.content))
@@ -100,10 +136,8 @@ impl Model {
                 buffer_and_scrollbar[0]
         );
 
-        
-        let (x, y) = self.current_buffer().cursor_pos();
-        if y >= self.current_buffer().top as u16 {
-            f.set_cursor(x, y - self.current_buffer().top as u16);
+        if cursor_y >= self.current_buffer().top as u16 {
+            f.set_cursor(cursor_x, cursor_y - self.current_buffer().top as u16);
         }
 
         let scrollbar = Scrollbar::default();
@@ -167,4 +201,5 @@ pub enum Message {
     MoveRight,
     MoveUp,
     MoveDown,
+    Backspace,
 }

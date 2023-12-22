@@ -32,7 +32,6 @@ fn main() -> anyhow::Result<()> {
 
 
     while model.running {
-
         terminal.draw(|frame| model.view(frame))?;
         let mut msg = handle_event(&model)?;
         while msg.is_some() {
