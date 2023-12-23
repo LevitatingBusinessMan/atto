@@ -56,15 +56,15 @@ impl View for Model {
 
         let (cursor_x, cursor_y) = current_buffer.cursor_pos();
 
-        // let buffer_widget = match highlight(&current_buffer) {
-        //     Ok(tokens) => Paragraph::new(tokens)            ,
-        //     Err(e) => {
-        //         Paragraph::new(current_buffer.content.as_str());
-        //         panic!("{}", e);
-        //     },
-        // };
+        let buffer_widget = match highlight(&current_buffer) {
+            Ok(tokens) => Paragraph::new(tokens),
+            Err(e) => {
+                Paragraph::new(current_buffer.content.as_str());
+                panic!("{}", e);
+            },
+        };
 
-        let buffer_widget = Paragraph::new(current_buffer.content.as_str());
+        // let buffer_widget = Paragraph::new(current_buffer.content.as_str());
 
         f.render_widget(
             buffer_widget
@@ -131,7 +131,7 @@ fn highlight(buffer: &Buffer) -> anyhow::Result<Vec<Line>> {
     let ts = ThemeSet::load_defaults();
     let ss = SyntaxSet::load_defaults_newlines();
 
-    let theme = &ts.themes["base16-ocean.dark"];
+    let theme = &ts.themes["base16-eighties.dark"];
 
     let syntax = match ss.find_syntax_by_extension("rs") {
         Some(syntax) => syntax,
@@ -158,7 +158,11 @@ fn highlight(buffer: &Buffer) -> anyhow::Result<Vec<Line>> {
 
         use syntect_tui::{into_span, SyntectTuiError};
         let spans: Result<Vec<Span>, SyntectTuiError> = iter.map(|t| into_span(t)).collect();
-        token_lines.push(Line::from(spans?));
+        // Remove background color
+        let spans: Vec<Span> = spans?.into_iter().map(|s| {
+            s.bg(ratatui::style::Color::Reset)
+        }).collect();
+        token_lines.push(Line::from(spans));
     }
 
     Ok(token_lines)
