@@ -128,7 +128,20 @@ impl Buffer {
     }
 
     pub fn move_word_right(&mut self) {
-        self.position += 5;
+        if self.current_char().is_whitespace() {
+            while self.current_char().is_whitespace() && self.position+1 != self.content.len() {
+                self.position += 1;
+            }
+        } else if self.current_char().is_alphanumeric() {
+            while self.current_char().is_alphanumeric() && self.position+1 != self.content.len() {
+                self.position += 1;
+            }
+        } else {
+            while !self.current_char().is_alphanumeric() && self.position+1 != self.content.len() {
+                self.position += 1;
+            }
+        }
+        self.prefered_col = None;
     }
 
     pub fn goto_start_of_line(&mut self) {
@@ -144,4 +157,7 @@ impl Buffer {
         self.prefered_col = None;
     }
 
+    fn current_char(&self) -> char {
+        return self.content.chars().nth(self.position).unwrap();
+    }
 }
