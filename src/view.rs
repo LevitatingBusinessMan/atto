@@ -1,7 +1,11 @@
 //! For rendering the model
-use ratatui::{Frame, layout::{Direction, Constraint, Layout, Rect}, widgets::{Paragraph, Scrollbar, ScrollbarState, Wrap, Block, Borders}, text::Line, style::{Style, Stylize}};
+use std::io::BufRead;
+
+use anyhow::anyhow;
+use ratatui::{Frame, layout::{Direction, Constraint, Layout, Rect}, widgets::{Paragraph, Scrollbar, ScrollbarState, Wrap, Block, Borders, Clear}, text::{Line, Span}, style::{Style, Stylize}};
 
 use crate::model::{Model, UtilityWindow};
+use crate::buffer::Buffer;
 
 pub trait View {
     fn view(&mut self, f: &mut Frame);
@@ -14,7 +18,7 @@ impl View for Model {
                 .constraints([Constraint::Min(0), Constraint::Length(1)])
                 .split(f.size());
 
-        let content_height = self.current_buffer().content.iter().filter(|c| **c == '\n' as u8).count();
+        let content_height = self.current_buffer().content.chars().filter(|c| *c == '\n').count();
         let scrollbar_width = if content_height as u16 > f.size().height {1} else {0};
 
         let buffer_and_scrollbar = Layout::default()
@@ -52,8 +56,18 @@ impl View for Model {
 
         let (cursor_x, cursor_y) = current_buffer.cursor_pos();
 
+        // let buffer_widget = match highlight(&current_buffer) {
+        //     Ok(tokens) => Paragraph::new(tokens)            ,
+        //     Err(e) => {
+        //         Paragraph::new(current_buffer.content.as_str());
+        //         panic!("{}", e);
+        //     },
+        // };
+
+        let buffer_widget = Paragraph::new(current_buffer.content.as_str());
+
         f.render_widget(
-            Paragraph::new(String::from_utf8_lossy(&current_buffer.content))
+            buffer_widget
             .scroll((current_buffer.top as u16,0)),
                 buffer_and_scrollbar[0]
         );
@@ -97,8 +111,62 @@ impl View for Model {
     }
 }
 
+// TODO this will have to move
+// preferably, after an insert, a thread is run
+// which uses a RefCell to update the highlighted lines
+// of the buffer. Preferably with some caching, maybe even with only parsing the edited lines.
+// The view should use this if it can be borrowed.
+// We can use the scopes for navigation (in HighlightState).
+
+// See https://docs.rs/syntect/latest/syntect/highlighting/struct.HighlightState.html
+// https://docs.rs/syntect/latest/syntect/parsing/struct.ParseState.html
+
+fn highlight(buffer: &Buffer) -> anyhow::Result<Vec<Line>> {
+    use syntect::highlighting::{ThemeSet, HighlightState, HighlightIterator, Highlighter};
+    use syntect::parsing::{SyntaxSet, ParseState, ScopeStack};
+    use syntect::util::LinesWithEndings;
+    use syntect::highlighting::Style as SyntectStyle;
+
+    let ts = ThemeSet::load_defaults();
+    let ss = SyntaxSet::load_defaults_newlines();
+
+    let theme = &ts.themes["base16-ocean.dark"];
+
+    let syntax = match ss.find_syntax_by_extension("rs") {
+        Some(syntax) => syntax,
+        None => {
+            let first_line = buffer.content.lines().next().ok_or(anyhow!("No first line"))?;
+            match ss.find_syntax_by_first_line(&first_line) {
+                Some(syntax) => syntax,
+                None => return Err(anyhow!("Unable to find syntax for {}", buffer.name)),
+            }
+        },
+    };
+
+    let lines = LinesWithEndings::from(&buffer.content);
+
+    let hl = Highlighter::new(theme);
+    let mut ps = ParseState::new(syntax);
+    let mut hs = HighlightState::new(&hl, ScopeStack::new());
+
+    let mut token_lines = vec![];
+
+    for line in lines {
+        let ops = ps.parse_line(line, &ss)?;
+        let iter = HighlightIterator::new(&mut hs, &ops, line, &hl);
+
+        use syntect_tui::{into_span, SyntectTuiError};
+        let spans: Result<Vec<Span>, SyntectTuiError> = iter.map(|t| into_span(t)).collect();
+        token_lines.push(Line::from(spans?));
+    }
+
+    Ok(token_lines)
+}
 
 fn render_help(f: &mut Frame, area: Rect) {
+
+    f.render_widget(Clear, area);
+
     f.render_widget(
         Paragraph::new(
 r"Welcome to Atto!

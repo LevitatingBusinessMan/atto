@@ -3,7 +3,7 @@ use std::cmp;
 #[derive(Clone, Debug)]
 pub struct Buffer {
     pub name: String,
-    pub content: Vec<u8>,
+    pub content: String,
     pub position: usize,
     pub read_only: bool,
     /// How far the buffer is scrolled
@@ -13,7 +13,7 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn new(name: String, content: Vec<u8>) -> Self {
+    pub fn new(name: String, content: String) -> Self {
         return Self {
             name,
             content,
@@ -27,7 +27,7 @@ impl Buffer {
     pub fn empty() -> Self {
         return Self {
             name: "Unknown".to_string(),
-            content: vec![],
+            content: String::new(),
             position: 0,
             read_only: false,
             top: 0,
@@ -47,12 +47,12 @@ impl Buffer {
     pub fn cursor_pos(&self) -> (u16, u16) {
         let mut newlines = 0;
         let mut row = 0;
-        for (index, chr) in self.content.iter().enumerate() {
+        for (index, chr) in self.content.chars().enumerate() {
             if index >= self.position {
                 break;
             }
             row += 1;
-            if *chr == '\n' as u8 {
+            if chr == '\n' {
                 newlines += 1;
                 row = 0;
             }
@@ -97,8 +97,8 @@ impl Buffer {
     }
 
     fn start_of_next_line(&self) -> Option<usize> {
-        for (index, chr) in self.content[self.position..].iter().enumerate() {
-            if *chr == '\n' as u8 {
+        for (index, chr) in self.content[self.position..].chars().enumerate() {
+            if chr == '\n' {
                 return Some(self.position + index + 1);
             }
         }
@@ -106,8 +106,8 @@ impl Buffer {
     }
 
     fn start_of_line(&self) -> usize {
-        for (index, chr) in self.content[..self.position].iter().rev().enumerate() {
-            if *chr == '\n' as u8 {
+        for (index, chr) in self.content[..self.position].chars().rev().enumerate() {
+            if chr == '\n' {
                 return self.position - index;
             }
         }
@@ -119,8 +119,8 @@ impl Buffer {
         if start_of_line == 0 {
             return None;
         }
-        for (index, chr) in self.content[..start_of_line-1].iter().rev().enumerate() {
-            if *chr == '\n' as u8 {
+        for (index, chr) in self.content[..start_of_line-1].chars().rev().enumerate() {
+            if chr == '\n' {
                 return Some(start_of_line  - 1 - index);
             }
         }

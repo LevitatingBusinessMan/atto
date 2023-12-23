@@ -1,5 +1,6 @@
 #![feature(int_roundings)]
-use std::{io, fs};
+#![feature(io_error_more)]
+use std::{io, fs, path::{Path, self}};
 
 use clap::Parser;
 use anyhow;
@@ -49,8 +50,8 @@ fn main() -> anyhow::Result<()> {
 
 fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer>> {
     files.iter().map(|f| Ok(Buffer::new(
-        f.clone(),
-        fs::read(f)?
+            f.clone(),
+            fs::read_to_string(f)?
     ))).collect()
 }
 mod tui {

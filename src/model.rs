@@ -28,7 +28,7 @@ pub enum UtilityWindow {
 
 impl Model {
 
-    pub fn new(buffers: Vec<Buffer>) -> Self {
+    pub fn new<'a>(buffers: Vec<Buffer>) -> Model {
         Model {
             buffers: buffers,
             selected: 0,
@@ -54,7 +54,7 @@ impl Model {
             },
             Message::InsertChar(chr) => {
                 let buffer = self.current_buffer_mut();
-                buffer.content.insert(buffer.position, chr as u8);
+                buffer.content.insert(buffer.position, chr);
                 buffer.move_right();
                 self.may_scroll = true;
             },
