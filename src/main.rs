@@ -7,7 +7,9 @@ use anyhow;
 mod buffer;
 mod handle_event;
 mod model;
+mod view;
 
+use view::View;
 use model::Model;
 use handle_event::handle_event;
 use buffer::Buffer;
