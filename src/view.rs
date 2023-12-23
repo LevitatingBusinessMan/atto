@@ -77,7 +77,8 @@ impl View for Model {
         }
 
         let scrollbar = Scrollbar::default();
-        let mut scrollbar_state = ScrollbarState::new(content_height).position(self.current_buffer().top);
+        let mut scrollbar_state = ScrollbarState::new(content_height.saturating_sub(f.size().height as usize))
+        .position(self.current_buffer().top);
         
         if scrollbar_width > 0 {
             f.render_stateful_widget(
