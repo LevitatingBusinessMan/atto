@@ -4,11 +4,11 @@ use ratatui::{Frame, layout::{Layout, Constraint, Direction, Rect}, widgets::{Bl
 
 use crate::buffer::Buffer;
 
-pub struct Model {
+pub struct Model<'a> {
     /// What buffer is selected
     pub selected: usize,
     /// What buffers are open
-    pub buffers: Vec<Buffer>,
+    pub buffers: Vec<Buffer<'a>>,
     /// If we should close the application
     pub running: bool,
     /// The utility window
@@ -26,11 +26,10 @@ pub enum UtilityWindow {
     Help,
 }
 
-impl Model {
-
-    pub fn new<'a>(buffers: Vec<Buffer>) -> Model {
+impl<'a> Model<'a> {
+    pub fn new(buffers: Vec<Buffer>) -> Model {
         Model {
-            buffers: buffers,
+            buffers:  buffers,
             selected: 0,
             running: true,
             utility: None,
@@ -92,12 +91,22 @@ impl Model {
         None
     }
 
-    pub fn current_buffer_mut(&mut self) -> &mut Buffer {
+    pub fn current_buffer_mut(&mut self) -> &mut Buffer<'a> {
         return &mut self.buffers[self.selected];
     }
 
     pub fn current_buffer(&self) -> &Buffer {
         return &self.buffers[self.selected];
+    }
+
+    pub fn highlight(&'a mut self) {
+        for buffer in self.buffers.iter_mut() {
+            if let Some(highlight_cache) = &buffer.highlight_cache {
+                if highlight_cache.dirty {
+                    buffer.highlight();
+                }
+            }
+        }
     }
 }
 pub enum Message {

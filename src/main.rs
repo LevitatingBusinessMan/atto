@@ -1,6 +1,7 @@
 #![feature(int_roundings)]
 #![feature(io_error_more)]
-use std::{io, fs, path::{Path, self}};
+#![feature(lazy_cell)]
+use std::{io, fs, path::{Path, self}, collections::HashMap, rc::Rc};
 
 use clap::Parser;
 use anyhow;
@@ -48,7 +49,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer>> {
+fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer<'static>>> {
     files.iter().map(|f| Ok(Buffer::new(
             f.clone(),
             fs::read_to_string(f)?
