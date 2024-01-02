@@ -11,7 +11,7 @@ pub trait View {
     fn view(&mut self, f: &mut Frame);
 }
 
-impl<'a> View for Model<'a> {
+impl View for Model {
     fn view(&mut self, f: &mut Frame) {
         let main = Layout::default()
                 .direction(Direction::Vertical)
@@ -56,12 +56,11 @@ impl<'a> View for Model<'a> {
 
         let (cursor_x, cursor_y) = current_buffer.cursor_pos();
 
-        let buffer_widget = match &current_buffer.highlight_cache {
-            Some(cache) => {
-                Paragraph::new(cache.lines.clone())
-            },
-            None => {
-                Paragraph::new(current_buffer.content.as_str())
+        let buffer_widget = match highlight(&current_buffer) {
+            Ok(tokens) => Paragraph::new(tokens),
+            Err(e) => {
+                Paragraph::new(current_buffer.content.as_str());
+                panic!("{}", e);
             },
         };
 
@@ -111,6 +110,62 @@ impl<'a> View for Model<'a> {
             None => {},
         }
     }
+}
+
+// TODO this will have to move
+// preferably, after an insert, a thread is run
+// which uses a RefCell to update the highlighted lines
+// of the buffer. Preferably with some caching, maybe even with only parsing the edited lines.
+// The view should use this if it can be borrowed.
+// We can use the scopes for navigation (in HighlightState).
+
+// See https://docs.rs/syntect/latest/syntect/highlighting/struct.HighlightState.html
+// https://docs.rs/syntect/latest/syntect/parsing/struct.ParseState.html
+
+fn highlight(buffer: &Buffer) -> anyhow::Result<Vec<Line>> {
+    use syntect::highlighting::{ThemeSet, HighlightState, HighlightIterator, Highlighter};
+    use syntect::parsing::{SyntaxSet, ParseState, ScopeStack};
+    use syntect::util::LinesWithEndings;
+    use syntect::highlighting::Style as SyntectStyle;
+
+    let ts = ThemeSet::load_defaults();
+    let ss = SyntaxSet::load_defaults_newlines();
+
+    let theme = &ts.themes["base16-eighties.dark"];
+
+    let syntax = match ss.find_syntax_by_extension("rs") {
+        Some(syntax) => syntax,
+        None => {
+            let first_line = buffer.content.lines().next().ok_or(anyhow!("No first line"))?;
+            match ss.find_syntax_by_first_line(&first_line) {
+                Some(syntax) => syntax,
+                None => return Err(anyhow!("Unable to find syntax for {}", buffer.name)),
+            }
+        },
+    };
+
+    let lines = LinesWithEndings::from(&buffer.content);
+
+    let hl = Highlighter::new(theme);
+    let mut ps = ParseState::new(syntax);
+    let mut hs = HighlightState::new(&hl, ScopeStack::new());
+
+    let mut token_lines = vec![];
+
+    for line in lines {
+        let ops = ps.parse_line(line, &ss)?;
+        let iter = HighlightIterator::new(&mut hs, &ops, line, &hl);
+
+        use syntect_tui::{into_span, SyntectTuiError};
+        let spans: Result<Vec<Span>, SyntectTuiError> = iter.map(|t| into_span(t)).collect();
+        // Remove background color
+        let spans: Vec<Span> = spans?.into_iter().map(|s| {
+            s.bg(ratatui::style::Color::Reset)
+        }).collect();
+        token_lines.push(Line::from(spans));
+    }
+
+    Ok(token_lines)
 }
 
 fn render_help(f: &mut Frame, area: Rect) {

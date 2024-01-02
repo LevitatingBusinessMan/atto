@@ -1,15 +1,7 @@
 use std::cmp;
 
-use ratatui::text::Line;
-use anyhow::anyhow;
-
-mod highlight;
-
-use highlight::HighLightCache;
-
-
 #[derive(Clone, Debug)]
-pub struct Buffer<'a> {
+pub struct Buffer {
     pub name: String,
     pub content: String,
     pub position: usize,
@@ -18,10 +10,9 @@ pub struct Buffer<'a> {
     pub top: usize,
     /// Which column the cursor wants to be in (that's vague I know)
     pub prefered_col: Option<usize>,
-    pub highlight_cache: Option<HighLightCache<'a>>,
 }
 
-impl<'a> Buffer<'a> {
+impl Buffer {
     pub fn new(name: String, content: String) -> Self {
         return Self {
             name,
@@ -30,7 +21,6 @@ impl<'a> Buffer<'a> {
             read_only: false,
             top: 0,
             prefered_col: None,
-            highlight_cache: None,
         }
     }
 
@@ -42,7 +32,6 @@ impl<'a> Buffer<'a> {
             read_only: false,
             top: 0,
             prefered_col: None,
-            highlight_cache: None,
         }
     }
 
@@ -170,45 +159,5 @@ impl<'a> Buffer<'a> {
 
     fn current_char(&self) -> char {
         return self.content.chars().nth(self.position).unwrap();
-    }
-
-    pub fn highlight(&'a mut self) {
-        use syntect::highlighting::ThemeSet;
-        use syntect::parsing::SyntaxSet;
-
-        let ts = ThemeSet::load_defaults();
-        let ss = SyntaxSet::load_defaults_newlines();
-    
-        let theme = &ts.themes["base16-eighties.dark"];    
-
-        let syntax = match ss.find_syntax_by_extension("rs") {
-            Some(syntax) => Ok(syntax),
-            None => {
-                match self.content.lines().next() {
-                    Some(first_line) => match ss.find_syntax_by_first_line(&first_line) {
-                        Some(syntax) => Ok(syntax),
-                        None => Err(anyhow!("Unable to find syntax")),
-                    },
-                    None => Err(anyhow!("No first line")),
-                }
-                
-            },
-        };
-
-        match syntax {
-            Ok(syntax) => {
-                self.highlight_cache = match highlight::highlight(&ss, theme, syntax,&self.content) {
-                    Ok(cache_) => {
-                        Some(cache_)
-                    },
-                    Err(_) => {
-                        None
-                    },
-                };
-            }
-            Err(_) => {
-                self.highlight_cache = None;
-            },
-        }
     }
 }
