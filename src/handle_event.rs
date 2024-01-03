@@ -17,7 +17,7 @@ impl Default for EventState {
 }
 
 pub fn handle_event(_m: &Model, state: &mut EventState) -> anyhow::Result<Option<Message>> {
-    if event::poll(time::Duration::from_millis(16))? {
+    if event::poll(time::Duration::from_millis(0))? {
         match event::read()?  {
             event::Event::Key(key) =>  Ok(handle_key(key, state)),
             event::Event::Mouse(mouse) => Ok(handle_mouse(mouse)),
