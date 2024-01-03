@@ -72,9 +72,12 @@ mod tui {
         enable_raw_mode()?;
         stdout().queue(crossterm::event::EnableMouseCapture)?;
         // https://docs.rs/crossterm/latest/crossterm/event/struct.KeyboardEnhancementFlags.html
-        stdout().queue(crossterm::event::PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES))?;
-        stdout().queue(crossterm::event::PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES))?;
-        stdout().queue(crossterm::event::PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::REPORT_EVENT_TYPES))?;
+       stdout().queue(crossterm::event::PushKeyboardEnhancementFlags(
+            KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+            | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
+            | KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+            | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
+        ))?;
         let terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
         Ok(terminal)
     }
@@ -82,7 +85,6 @@ mod tui {
     pub fn restore() -> anyhow::Result<()> {
         stdout().execute(LeaveAlternateScreen)?;
         stdout().execute(crossterm::event::PopKeyboardEnhancementFlags)?;
-        stdout().execute(crossterm::event::DisableMouseCapture)?;
         disable_raw_mode()?;
         Ok(())
     }

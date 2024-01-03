@@ -9,7 +9,7 @@ edition = "2021"
 anyhow = "1.0.76"
 clap = { version = "4.4.11", features = ["derive"] }
 color-eyre = "0.6.2"
-crossterm = "0.27.0"
+crossterm = "0.27"
 ratatui = "0.25.0"
 syntect = "5.1"
 syntect-tui = { path = "syntect-tui" }
