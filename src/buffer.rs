@@ -144,7 +144,7 @@ impl Buffer {
                 self.position += 1;
             }
         } else if self.current_char().is_alphanumeric() {
-            while self.current_char().is_alphanumeric() && self.position+1 != self.content.len() {
+            while (self.current_char().is_alphanumeric() || self.current_char() == '_') && self.position+1 != self.content.len() {
                 self.position += 1;
             }
         } else {

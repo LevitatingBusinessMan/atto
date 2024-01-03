@@ -2,7 +2,7 @@ use std::{io::{self, Read, Cursor}};
 
 use syntect::highlighting::ThemeSet;
 
-static DRACULA: &[u8] =  include_bytes!("../dracula/Dracula.tmTheme");
+static DRACULA: &[u8] =  include_bytes!("../themes/Dracula.tmTheme");
 
 pub fn theme_set() -> io::Result<ThemeSet> {
     let mut theme_set = ThemeSet::load_defaults();

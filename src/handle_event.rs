@@ -42,7 +42,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
         }
     }
 
-    if key.kind == crossterm::event::KeyEventKind::Press {
+    if key.kind == crossterm::event::KeyEventKind::Press || key.kind == crossterm::event::KeyEventKind::Repeat {
         if key.modifiers.contains(KeyModifiers::ALT) {
             match key.code {
                 KeyCode::Char('i') => Some(Message::MoveUp),
