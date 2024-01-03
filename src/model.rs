@@ -5,6 +5,10 @@ use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 
 use crate::{buffer::Buffer, parse::{ParseCache, self}};
 
+use self::find::FindUtility;
+
+mod find;
+
 pub struct Model {
     /// What buffer is selected
     pub selected: usize,
@@ -29,6 +33,7 @@ pub struct Model {
 /// The top right window
 pub enum UtilityWindow {
     Help,
+    Find(FindUtility),
 }
 
 impl Model {
@@ -60,6 +65,7 @@ impl Model {
 
     pub fn update(&mut self, msg: Message) -> Option<Message> {
         match msg {
+            // The following messages will always be handled by the main model
             Message::NextBuffer => self.selected = (self.selected + 1) % self.buffers.len(),
             Message::PreviousBuffer => self.selected = (self.selected + self.buffers.len() - 1) % self.buffers.len(),
             Message::Quit => self.running = false,
@@ -71,40 +77,51 @@ impl Model {
                     self.utility = None;
                 }
             },
-            Message::InsertChar(chr) => {
-                self.current_buffer_mut().insert(chr);
-                self.may_scroll = true;
-            },
-            Message::MoveLeft => {
-                self.current_buffer_mut().move_left();
-                self.may_scroll = true;
-            },
-            Message::MoveRight => {
-                self.current_buffer_mut().move_right();
-                self.may_scroll = true;
-            },
-            Message::MoveUp => {
-                self.current_buffer_mut().move_up();
-                self.may_scroll = true;
-            },
-            Message::MoveDown => {
-                self.current_buffer_mut().move_down();
-                self.may_scroll = true;
-            },
-            Message::Backspace => {
-                let cur = self.current_buffer_mut();
-                if cur.position > 0 {
-                    cur.content.remove(cur.position-1);
-                    return Some(Message::MoveLeft);
-                }
-            },
-            Message::JumpWordRight => {
-                self.current_buffer_mut().move_word_right();
-                self.may_scroll = true;
-            },
-            Message::GotoStartOfLine => self.current_buffer_mut().goto_start_of_line(),
-            Message::GotoEndOfLine => self.current_buffer_mut().goto_end_of_line(),
-            Message::Enter => return Some(Message::InsertChar('\n')),
+            Message::OpenFind => self.utility = Some(UtilityWindow::Find(find::FindUtility::new())),
+
+            // The following messages might be handled by the utility
+            _ => match &mut self.utility {
+                Some(UtilityWindow::Find(find)) => {
+                    return find.update(msg);
+                },
+                _ => match msg {
+                    Message::InsertChar(chr) => {
+                        self.current_buffer_mut().insert(chr);
+                        self.may_scroll = true;
+                    },
+                    Message::MoveLeft => {
+                        self.current_buffer_mut().move_left();
+                        self.may_scroll = true;
+                    },
+                    Message::MoveRight => {
+                        self.current_buffer_mut().move_right();
+                        self.may_scroll = true;
+                    },
+                    Message::MoveUp => {
+                        self.current_buffer_mut().move_up();
+                        self.may_scroll = true;
+                    },
+                    Message::MoveDown => {
+                        self.current_buffer_mut().move_down();
+                        self.may_scroll = true;
+                    },
+                    Message::Backspace => {
+                        let cur = self.current_buffer_mut();
+                        if cur.position > 0 {
+                            cur.content.remove(cur.position-1);
+                            return Some(Message::MoveLeft);
+                        }
+                    },
+                    Message::JumpWordRight => {
+                        self.current_buffer_mut().move_word_right();
+                        self.may_scroll = true;
+                    },
+                    Message::GotoStartOfLine => self.current_buffer_mut().goto_start_of_line(),
+                    Message::GotoEndOfLine => self.current_buffer_mut().goto_end_of_line(),
+                    Message::Enter => return Some(Message::InsertChar('\n')),
+                    _ => unreachable!(),
+                },
+            }
         }
         None
     }
@@ -139,4 +156,5 @@ pub enum Message {
     GotoStartOfLine,
     GotoEndOfLine,
     Enter,
+    OpenFind,
 }

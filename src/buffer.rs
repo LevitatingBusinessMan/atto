@@ -155,6 +155,7 @@ impl Buffer {
         self.prefered_col = None;
     }
 
+    // TODO make this go to the first non whitespace char if it exists
     pub fn goto_start_of_line(&mut self) {
         self.position = self.start_of_line();
         self.prefered_col = None;
