@@ -11,7 +11,7 @@ use syntect_tui::{SyntectTuiError, into_span};
 use tracing::{debug, debug_span};
 
 const CACHE_FREQUENCY: usize = 30;
-const TABSIZE: usize = 4;
+pub const TABSIZE: usize = 4;
 
 use crate::buffer::Buffer;
 
