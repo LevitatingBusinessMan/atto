@@ -152,7 +152,7 @@ impl Buffer {
                 self.position += 1;
             }
         } else {
-            while !self.current_char().is_alphanumeric() && self.position+1 != self.content.len() && self.current_char() != '\n' {
+            while !self.current_char().is_alphanumeric()  && !self.current_char().is_whitespace() && self.position+1 != self.content.len() && self.current_char() != '\n' {
                 self.position += 1;
             }
         }
