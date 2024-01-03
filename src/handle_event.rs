@@ -7,12 +7,15 @@ use tracing::debug;
 use crate::model::{Model, Message};
 
 pub struct EventState {
-    space_down: bool
+    /// For word jumping
+    space_down: bool,
+    /// For reverse word jumping with space
+    movement_key_down: Option<char>,
 }
 
 impl Default for EventState {
     fn default() -> Self {
-        Self { space_down: false }
+        Self { space_down: false, movement_key_down: None }
     }
 }
 
@@ -42,6 +45,15 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
         }
     }
 
+    // If a movement key is held (so space can jump in that direction)
+    if key.code == KeyCode::Char('j') {
+        if let Some('j') = state.movement_key_down && key.kind == crossterm::event::KeyEventKind::Release {
+            state.movement_key_down = None;
+        } else if key.kind == crossterm::event::KeyEventKind::Press {
+            state.movement_key_down = Some('j');
+        }
+    }
+
     if key.kind == crossterm::event::KeyEventKind::Press || key.kind == crossterm::event::KeyEventKind::Repeat {
         if key.modifiers.contains(KeyModifiers::ALT) {
             match key.code {
@@ -57,6 +69,14 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Char('f') => Some(Message::MoveLeft),
                 KeyCode::Char('a') => Some(Message::GotoStartOfLine),
                 KeyCode::Char('e') => Some(Message::GotoEndOfLine),
+                // Reverse word jumping
+                KeyCode::Char(' ') => {
+                    if let Some('j') = state.movement_key_down {
+                        Some(Message::JumpWordRight)
+                    } else {
+                        None
+                    }
+                }
                 _ => None
             }
         } else if key.modifiers.contains(KeyModifiers::CONTROL) {

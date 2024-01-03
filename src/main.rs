@@ -1,6 +1,7 @@
 #![feature(int_roundings)]
 #![feature(io_error_more)]
 #![feature(iter_advance_by)]
+#![feature(let_chains)]
 use std::{io, fs, path::{Path, self}};
 
 use clap::Parser;
