@@ -56,19 +56,23 @@ impl Buffer {
 
     /// Get position as column and row
     pub fn cursor_pos(&self) -> (u16, u16) {
-        let mut newlines = 0;
         let mut row = 0;
+        let mut col = 0;
         for (index, chr) in self.content.chars().enumerate() {
             if index >= self.position {
                 break;
             }
-            row += 1;
+            if chr == '\t' {
+                col += crate::parse::TABSIZE as u16;
+            } else {
+                col += 1;
+            }
             if chr == '\n' {
-                newlines += 1;
-                row = 0;
+                row += 1;
+                col = 0;
             }
         }
-        return (row, newlines)
+        return (col, row)
     }
 
     pub fn move_left(&mut self) {

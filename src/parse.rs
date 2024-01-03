@@ -11,6 +11,7 @@ use syntect_tui::{SyntectTuiError, into_span};
 use tracing::{debug, debug_span};
 
 const CACHE_FREQUENCY: usize = 30;
+pub const TABSIZE: usize = 4;
 
 use crate::buffer::Buffer;
 
@@ -65,7 +66,11 @@ pub fn parse_from<'a>(from: usize, mut lines: LinesWithEndings<'a>, limit: usize
         
         if line_no >= from {
             // Remove background color
-            let spans: Vec<Span> = spans?.into_iter().map(|s| {
+            let spans: Vec<Span> = spans?.into_iter().map(|mut s| {
+                if s.content.contains('\t') {
+                    let content = s.content.replace("\t", &" ".repeat(TABSIZE));
+                    s = s.content(content);
+                } 
                 s.bg(ratatui::style::Color::Reset)
             }).collect();
 
