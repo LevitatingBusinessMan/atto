@@ -83,8 +83,8 @@ mod tui {
     }
 
     pub fn restore() -> anyhow::Result<()> {
-        stdout().execute(LeaveAlternateScreen)?;
         stdout().execute(crossterm::event::PopKeyboardEnhancementFlags)?;
+        stdout().execute(LeaveAlternateScreen)?;
         disable_raw_mode()?;
         Ok(())
     }
