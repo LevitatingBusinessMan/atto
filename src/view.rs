@@ -63,6 +63,7 @@ impl View for Model {
         let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache, &self.syntax_set, self.theme()) {
             Ok(tokens) => Paragraph::new(tokens),
             Err(e) => {
+                // TODO cover tabs here
                 Paragraph::new(current_buffer.content.as_str()).scroll((current_buffer.top as u16,0))
             },
         };
