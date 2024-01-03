@@ -1,10 +1,11 @@
 //! For rendering the model
-use std::io::BufRead;
+use std::{io::BufRead, cell::RefCell, rc::Rc};
 
 use anyhow::anyhow;
 use ratatui::{Frame, layout::{Direction, Constraint, Layout, Rect}, widgets::{Paragraph, Scrollbar, ScrollbarState, Wrap, Block, Borders, Clear}, text::{Line, Span}, style::{Style, Stylize}};
+use syntect::{util::LinesWithEndings, highlighting::{Highlighter, ThemeSet}, parsing::SyntaxSet};
 
-use crate::model::{Model, UtilityWindow};
+use crate::{model::{Model, UtilityWindow, self}, parse::{parse_from, ParseCache}};
 use crate::buffer::Buffer;
 
 pub trait View {
@@ -56,7 +57,9 @@ impl View for Model {
 
         let (cursor_x, cursor_y) = current_buffer.cursor_pos();
 
-        let buffer_widget = match highlight(&current_buffer) {
+        let cache = self.parse_caches.get(&current_buffer.name).unwrap().clone();
+
+        let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache) {
             Ok(tokens) => Paragraph::new(tokens),
             Err(e) => {
                 Paragraph::new(current_buffer.content.as_str());
@@ -112,22 +115,7 @@ impl View for Model {
     }
 }
 
-// TODO this will have to move
-// preferably, after an insert, a thread is run
-// which uses a RefCell to update the highlighted lines
-// of the buffer. Preferably with some caching, maybe even with only parsing the edited lines.
-// The view should use this if it can be borrowed.
-// We can use the scopes for navigation (in HighlightState).
-
-// See https://docs.rs/syntect/latest/syntect/highlighting/struct.HighlightState.html
-// https://docs.rs/syntect/latest/syntect/parsing/struct.ParseState.html
-
-fn highlight(buffer: &Buffer) -> anyhow::Result<Vec<Line>> {
-    use syntect::highlighting::{ThemeSet, HighlightState, HighlightIterator, Highlighter};
-    use syntect::parsing::{SyntaxSet, ParseState, ScopeStack};
-    use syntect::util::LinesWithEndings;
-    use syntect::highlighting::Style as SyntectStyle;
-
+fn highlight<'a>(buffer: &'a Buffer, height: usize, cache: Rc<RefCell<ParseCache>>) -> anyhow::Result<Vec<Line<'a>>> {
     let ts = ThemeSet::load_defaults();
     let ss = SyntaxSet::load_defaults_newlines();
 
@@ -147,25 +135,8 @@ fn highlight(buffer: &Buffer) -> anyhow::Result<Vec<Line>> {
     let lines = LinesWithEndings::from(&buffer.content);
 
     let hl = Highlighter::new(theme);
-    let mut ps = ParseState::new(syntax);
-    let mut hs = HighlightState::new(&hl, ScopeStack::new());
 
-    let mut token_lines = vec![];
-
-    for line in lines {
-        let ops = ps.parse_line(line, &ss)?;
-        let iter = HighlightIterator::new(&mut hs, &ops, line, &hl);
-
-        use syntect_tui::{into_span, SyntectTuiError};
-        let spans: Result<Vec<Span>, SyntectTuiError> = iter.map(|t| into_span(t)).collect();
-        // Remove background color
-        let spans: Vec<Span> = spans?.into_iter().map(|s| {
-            s.bg(ratatui::style::Color::Reset)
-        }).collect();
-        token_lines.push(Line::from(spans));
-    }
-
-    Ok(token_lines)
+    parse_from(buffer.top, lines, height, &mut cache.borrow_mut(), &hl, syntax, &ss)
 }
 
 fn render_help(f: &mut Frame, area: Rect) {

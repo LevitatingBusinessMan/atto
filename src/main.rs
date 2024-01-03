@@ -1,5 +1,6 @@
 #![feature(int_roundings)]
 #![feature(io_error_more)]
+#![feature(iter_advance_by)]
 use std::{io, fs, path::{Path, self}};
 
 use clap::Parser;
@@ -9,6 +10,7 @@ mod buffer;
 mod handle_event;
 mod model;
 mod view;
+mod parse;
 
 use view::View;
 use model::Model;

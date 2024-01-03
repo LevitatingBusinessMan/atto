@@ -1,8 +1,8 @@
-use std::rc::Rc;
+use std::{rc::Rc, collections::HashMap, cell::RefCell};
 
 use ratatui::{Frame, layout::{Layout, Constraint, Direction, Rect}, widgets::{Block, Paragraph, Borders, Wrap, Scrollbar, ScrollbarState}, style::{Style, Stylize}, text::Line, Terminal, backend::Backend};
 
-use crate::buffer::Buffer;
+use crate::{buffer::Buffer, parse::{ParseCache, self}};
 
 pub struct Model {
     /// What buffer is selected
@@ -19,6 +19,7 @@ pub struct Model {
     /// the buffer because the cursor might've moved 
     /// out of view; 
     pub may_scroll: bool,
+    pub parse_caches: HashMap<String, Rc<RefCell<ParseCache>>>,
 }
 
 /// The top right window
@@ -29,6 +30,13 @@ pub enum UtilityWindow {
 impl Model {
 
     pub fn new<'a>(buffers: Vec<Buffer>) -> Model {
+        let parse_caches = (|| {
+            let mut map = HashMap::new();
+            for buf in &buffers {
+                map.insert(buf.name.clone(), Rc::new(RefCell::new(ParseCache::new())));
+            }
+            map
+        })();
         Model {
             buffers: buffers,
             selected: 0,
@@ -36,6 +44,7 @@ impl Model {
             utility: None,
             cursor: (0,0),
             may_scroll: false,
+            parse_caches,
         }
     }
 

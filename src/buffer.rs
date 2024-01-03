@@ -1,4 +1,5 @@
-use std::cmp;
+use std::{cmp, collections::HashMap};
+use crate::parse::*;
 
 #[derive(Clone, Debug)]
 pub struct Buffer {
@@ -10,6 +11,8 @@ pub struct Buffer {
     pub top: usize,
     /// Which column the cursor wants to be in (that's vague I know)
     pub prefered_col: Option<usize>,
+    /// The cached parse states for this buffer
+    pub parse_cache: HashMap<usize, CachedParseState>,
 }
 
 impl Buffer {
@@ -21,6 +24,7 @@ impl Buffer {
             read_only: false,
             top: 0,
             prefered_col: None,
+            parse_cache: HashMap::new(),
         }
     }
 
@@ -32,6 +36,7 @@ impl Buffer {
             read_only: false,
             top: 0,
             prefered_col: None,
+            parse_cache: HashMap::new(),
         }
     }
 
