@@ -1,30 +1,38 @@
 use std::time;
-
 use anyhow::Ok;
-use crossterm::event::{self, KeyModifiers, KeyCode, ModifierKeyCode};
+use crossterm::event::{self, KeyModifiers, KeyCode, ModifierKeyCode, Event};
 use tracing::debug;
 
 use crate::model::{Model, Message};
 
 pub struct EventState {
-    space_down: bool
+    space_down: bool,
+    /// This event was pekeed but then wasn't consumed
+    peeked_event: Option<Event>,
 }
 
 impl Default for EventState {
     fn default() -> Self {
-        Self { space_down: false }
+        Self { space_down: false, peeked_event: None }
     }
 }
 
 pub fn handle_event(_m: &Model, state: &mut EventState) -> anyhow::Result<Option<Message>> {
-    if event::poll(time::Duration::from_millis(16))? {
-        match event::read()?  {
-            event::Event::Key(key) =>  Ok(handle_key(key, state)),
-            event::Event::Mouse(mouse) => Ok(handle_mouse(mouse)),
-            _ => Ok(None),
-        }
-    } else {
-        Ok(None)
+    let event = match state.peeked_event.clone() {
+        Some(event) => event,
+        None => {
+            if event::poll(time::Duration::from_millis(16))? {
+                event::read()?
+            } else {
+                return Ok(None)
+            }       
+        },
+    };
+
+    match event  {
+        event::Event::Key(key) =>  Ok(handle_key(key, state)),
+        event::Event::Mouse(mouse) => Ok(handle_mouse(mouse, state)),
+        _ => Ok(None),
     }
 }
 
@@ -85,10 +93,43 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
     }
 }
 
-fn handle_mouse(mouse: event::MouseEvent) -> Option<Message> {
+fn handle_mouse(mouse: event::MouseEvent, state: &mut EventState) -> Option<Message> {
     match mouse.kind {
-        event::MouseEventKind::ScrollDown => Some(Message::ScrollDown),
-        event::MouseEventKind::ScrollUp => Some(Message::ScrollUp),
+        event::MouseEventKind::ScrollDown | event::MouseEventKind::ScrollUp => {
+            let mut scroll: i16 = match mouse.kind {
+                event::MouseEventKind::ScrollDown => -1,
+                event::MouseEventKind::ScrollUp => 1,
+                _ => unreachable!()
+            };
+
+            loop {
+                use std::result::Result::Ok;
+                if let Ok(true) = event::poll(time::Duration::from_millis(0)) {
+                    if let Ok(event) = event::read() {
+                        state.peeked_event = Some(event.clone());
+                        if let Event::Mouse(mouse_event) = event {
+                            if mouse_event.kind == event::MouseEventKind::ScrollDown || mouse_event.kind == event::MouseEventKind::ScrollUp {
+                                scroll += match mouse_event.kind {
+                                    event::MouseEventKind::ScrollDown => -1,
+                                    event::MouseEventKind::ScrollUp => 1,
+                                    _ => unreachable!(),
+                                };
+                                state.peeked_event = None;
+                            }
+                        }
+                    }
+                }
+                break
+            }
+
+            debug!("Scroll {scroll}");
+
+            if scroll > 1 {
+                Some(Message::ScrollUp(scroll.unsigned_abs()))
+            } else {
+                Some(Message::ScrollDown(scroll.unsigned_abs()))
+            }
+        },
         _ => None
     }
 }

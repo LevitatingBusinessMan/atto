@@ -63,8 +63,8 @@ impl Model {
             Message::NextBuffer => self.selected = (self.selected + 1) % self.buffers.len(),
             Message::PreviousBuffer => self.selected = (self.selected + self.buffers.len() - 1) % self.buffers.len(),
             Message::Quit => self.running = false,
-            Message::ScrollDown => self.current_buffer_mut().top += 1,
-            Message::ScrollUp => self.current_buffer_mut().top = self.current_buffer_mut().top.checked_sub(1).unwrap_or_default(),
+            Message::ScrollDown(n) => self.current_buffer_mut().top += n as usize,
+            Message::ScrollUp(n) => self.current_buffer_mut().top = self.current_buffer_mut().top.checked_sub(n as usize).unwrap_or_default(),
             Message::OpenHelp => self.utility = Some(UtilityWindow::Help),
             Message::Escape => {
                 if self.utility.is_some() {
@@ -125,8 +125,8 @@ pub enum Message {
     NextBuffer,
     PreviousBuffer,
     Quit,
-    ScrollDown,
-    ScrollUp,
+    ScrollDown(u16),
+    ScrollUp(u16),
     OpenHelp,
     Escape,
     InsertChar(char),
