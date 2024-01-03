@@ -1,4 +1,7 @@
 use std::{cmp, collections::HashMap};
+use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxReference};
+use anyhow::anyhow;
+
 use crate::parse::*;
 
 #[derive(Clone, Debug)]
@@ -13,6 +16,7 @@ pub struct Buffer {
     pub prefered_col: Option<usize>,
     /// The cached parse states for this buffer
     pub parse_cache: HashMap<usize, CachedParseState>,
+    pub syntax: Option<SyntaxReference>,
 }
 
 impl Buffer {
@@ -25,6 +29,7 @@ impl Buffer {
             top: 0,
             prefered_col: None,
             parse_cache: HashMap::new(),
+            syntax: None,
         }
     }
 
@@ -37,6 +42,7 @@ impl Buffer {
             top: 0,
             prefered_col: None,
             parse_cache: HashMap::new(),
+            syntax: None,
         }
     }
 
@@ -165,4 +171,31 @@ impl Buffer {
     fn current_char(&self) -> char {
         return self.content.chars().nth(self.position).unwrap();
     }
+
+    pub fn insert(&mut self, chr: char) {
+        self.content.insert(self.position, chr);
+        self.move_right();
+        // invalidating from top is faster than figuring out the current line
+        // and you render from the top anyway
+        self.parse_cache.invalidate_from(self.top);
+    }
+
+    // Tries to find and set a syntax
+    pub fn find_syntax<'a>(&mut self, syntax_set: &'a SyntaxSet) -> Option<&'a SyntaxReference> {
+        let extension = self.name.split('.').last().unwrap_or("");
+        let syntax = match syntax_set.find_syntax_by_extension(extension) {
+            Some(syntax) => Some(syntax),
+            None => {
+                match self.content.lines().next() {
+                    Some(first_line) => syntax_set.find_syntax_by_first_line(&first_line),
+                    None => None,
+                }
+            },
+        };
+        if let Some(syntax) = syntax {
+            self.syntax = Some(syntax.clone());
+        }
+        syntax
+    }
+
 }

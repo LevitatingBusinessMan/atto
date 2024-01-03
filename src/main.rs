@@ -11,7 +11,9 @@ mod handle_event;
 mod model;
 mod view;
 mod parse;
+mod logging;
 
+use logging::setup_logging;
 use view::View;
 use model::Model;
 use handle_event::handle_event;
@@ -23,6 +25,9 @@ struct Args {
 }
 
 fn main() -> anyhow::Result<()> {
+
+    let _ = setup_logging();
+
     let args = Args::parse();
     let buffers = match args.files {
         Some(files) => read_files(files),

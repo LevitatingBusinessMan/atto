@@ -1,6 +1,7 @@
 use std::{rc::Rc, collections::HashMap, cell::RefCell};
 
 use ratatui::{Frame, layout::{Layout, Constraint, Direction, Rect}, widgets::{Block, Paragraph, Borders, Wrap, Scrollbar, ScrollbarState}, style::{Style, Stylize}, text::Line, Terminal, backend::Backend};
+use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 
 use crate::{buffer::Buffer, parse::{ParseCache, self}};
 
@@ -20,6 +21,9 @@ pub struct Model {
     /// out of view; 
     pub may_scroll: bool,
     pub parse_caches: HashMap<String, Rc<RefCell<ParseCache>>>,
+    pub theme_set: ThemeSet,
+    pub syntax_set: SyntaxSet,
+    pub theme: String,
 }
 
 /// The top right window
@@ -29,7 +33,7 @@ pub enum UtilityWindow {
 
 impl Model {
 
-    pub fn new<'a>(buffers: Vec<Buffer>) -> Model {
+    pub fn new<'a>(mut buffers: Vec<Buffer>) -> Model {
         let parse_caches = (|| {
             let mut map = HashMap::new();
             for buf in &buffers {
@@ -37,6 +41,10 @@ impl Model {
             }
             map
         })();
+        let syntax_set = SyntaxSet::load_defaults_newlines();
+        for buffer in &mut buffers {
+            buffer.find_syntax(&syntax_set);
+        }
         Model {
             buffers: buffers,
             selected: 0,
@@ -45,6 +53,9 @@ impl Model {
             cursor: (0,0),
             may_scroll: false,
             parse_caches,
+            theme_set: ThemeSet::load_defaults(),
+            syntax_set: SyntaxSet::load_defaults_newlines(),
+            theme: "base16-eighties.dark".to_owned(),
         }
     }
 
@@ -62,9 +73,7 @@ impl Model {
                 }
             },
             Message::InsertChar(chr) => {
-                let buffer = self.current_buffer_mut();
-                buffer.content.insert(buffer.position, chr);
-                buffer.move_right();
+                self.current_buffer_mut().insert(chr);
                 self.may_scroll = true;
             },
             Message::MoveLeft => {
@@ -107,6 +116,10 @@ impl Model {
 
     pub fn current_buffer(&self) -> &Buffer {
         return &self.buffers[self.selected];
+    }
+
+    pub fn theme(&self) -> &Theme {
+        return &self.theme_set.themes[&self.theme]
     }
 }
 pub enum Message {

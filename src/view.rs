@@ -3,7 +3,8 @@ use std::{io::BufRead, cell::RefCell, rc::Rc};
 
 use anyhow::anyhow;
 use ratatui::{Frame, layout::{Direction, Constraint, Layout, Rect}, widgets::{Paragraph, Scrollbar, ScrollbarState, Wrap, Block, Borders, Clear}, text::{Line, Span}, style::{Style, Stylize}};
-use syntect::{util::LinesWithEndings, highlighting::{Highlighter, ThemeSet}, parsing::SyntaxSet};
+use syntect::{util::LinesWithEndings, highlighting::{Highlighter, ThemeSet, Theme}, parsing::SyntaxSet};
+use tracing::debug;
 
 use crate::{model::{Model, UtilityWindow, self}, parse::{parse_from, ParseCache}};
 use crate::buffer::Buffer;
@@ -59,17 +60,16 @@ impl View for Model {
 
         let cache = self.parse_caches.get(&current_buffer.name).unwrap().clone();
 
-        let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache) {
+        let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache, &self.syntax_set, self.theme()) {
             Ok(tokens) => Paragraph::new(tokens),
             Err(e) => {
-                Paragraph::new(current_buffer.content.as_str())
+                Paragraph::new(current_buffer.content.as_str()).scroll((current_buffer.top as u16,0))
             },
         };
 
         f.render_widget(
-            buffer_widget
-            .scroll((current_buffer.top as u16,0)),
-                buffer_and_scrollbar[0]
+            buffer_widget,
+            buffer_and_scrollbar[0]
         );
 
         if cursor_y >= self.current_buffer().top as u16 {
@@ -112,28 +112,11 @@ impl View for Model {
     }
 }
 
-fn highlight<'a>(buffer: &'a Buffer, height: usize, cache: Rc<RefCell<ParseCache>>) -> anyhow::Result<Vec<Line<'a>>> {
-    let ts = ThemeSet::load_defaults();
-    let ss = SyntaxSet::load_defaults_newlines();
-
-    let theme = &ts.themes["base16-eighties.dark"];
-
-    let syntax = match ss.find_syntax_by_extension("rs") {
-        Some(syntax) => syntax,
-        None => {
-            let first_line = buffer.content.lines().next().ok_or(anyhow!("No first line"))?;
-            match ss.find_syntax_by_first_line(&first_line) {
-                Some(syntax) => syntax,
-                None => return Err(anyhow!("Unable to find syntax for {}", buffer.name)),
-            }
-        },
-    };
-
+fn highlight<'a>(buffer: &'a Buffer, height: usize, cache: Rc<RefCell<ParseCache>>, syntax_set: &SyntaxSet, theme: &Theme) -> anyhow::Result<Vec<Line<'a>>> {
     let lines = LinesWithEndings::from(&buffer.content);
-
     let hl = Highlighter::new(theme);
-
-    parse_from(buffer.top, lines, height, &mut cache.borrow_mut(), &hl, syntax, &ss)
+    let syntax = buffer.syntax.as_ref().unwrap_or(syntax_set.find_syntax_plain_text());
+    parse_from(buffer.top, lines, height, &mut cache.borrow_mut(), &hl, syntax, &syntax_set)
 }
 
 fn render_help(f: &mut Frame, area: Rect) {

@@ -8,6 +8,9 @@ use syntect::parsing::{ParseState, SyntaxReference, ScopeStack, SyntaxSet};
 use syntect::highlighting::{HighlightState, Theme, Highlighter, HighlightIterator};
 use syntect::util::LinesWithEndings;
 use syntect_tui::{SyntectTuiError, into_span};
+use tracing::{debug, debug_span};
+
+const CACHE_FREQUENCY: usize = 30;
 
 use crate::buffer::Buffer;
 
@@ -33,7 +36,6 @@ impl ParseCacheTrait for ParseCache {
     }
 }
 
-/// Make sure the cache is filled for a certain range
 pub fn parse_from<'a>(from: usize, mut lines: LinesWithEndings<'a>, limit: usize, cache: &mut HashMap<usize, CachedParseState>, highlighter: &Highlighter, syntax: &SyntaxReference, syntax_set: &SyntaxSet) 
 -> anyhow::Result<Vec<Line<'a>>> {
     let (start, mut state) = match cache.closest_state(from) {
@@ -41,12 +43,18 @@ pub fn parse_from<'a>(from: usize, mut lines: LinesWithEndings<'a>, limit: usize
         None => (0, CachedParseState::new(highlighter, syntax)),
     };
 
-    lines.advance_by(start).unwrap();
+    debug!("Start of parse is {} away from top({})", from-start, from);
+
+    //lines.advance_by(start).unwrap();
 
     let mut lexemes: Vec<Line<'a>> = vec![];
 
     for (line_no, line) in lines.enumerate() {
-        if line_no % 50 == 0 {
+        if line_no < start {
+            continue;
+        }
+        // Possibly cache the state
+        if line_no % CACHE_FREQUENCY == 0 {
             cache.insert(line_no, state.clone());
         }
 
@@ -55,12 +63,14 @@ pub fn parse_from<'a>(from: usize, mut lines: LinesWithEndings<'a>, limit: usize
         
         let spans: Result<Vec<Span>, SyntectTuiError> = iter.map(|t| syntect_tui::into_span(t)).collect();
         
-        // Remove background color
-        let spans: Vec<Span> = spans?.into_iter().map(|s| {
-            s.bg(ratatui::style::Color::Reset)
-        }).collect();
+        if line_no >= from {
+            // Remove background color
+            let spans: Vec<Span> = spans?.into_iter().map(|s| {
+                s.bg(ratatui::style::Color::Reset)
+            }).collect();
 
-        lexemes.push(Line::from(spans));
+            lexemes.push(Line::from(spans));
+        }
 
         if line_no > from+limit {
             break;
