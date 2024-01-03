@@ -62,12 +62,9 @@ impl View for Model {
         let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache) {
             Ok(tokens) => Paragraph::new(tokens),
             Err(e) => {
-                Paragraph::new(current_buffer.content.as_str());
-                panic!("{}", e);
+                Paragraph::new(current_buffer.content.as_str())
             },
         };
-
-        // let buffer_widget = Paragraph::new(current_buffer.content.as_str());
 
         f.render_widget(
             buffer_widget

@@ -46,6 +46,10 @@ pub fn parse_from<'a>(from: usize, mut lines: LinesWithEndings<'a>, limit: usize
     let mut lexemes: Vec<Line<'a>> = vec![];
 
     for (line_no, line) in lines.enumerate() {
+        if line_no % 50 == 0 {
+            cache.insert(line_no, state.clone());
+        }
+
         let ops = state.ps.parse_line(line, syntax_set)?;
         let iter = HighlightIterator::new(&mut state.hs, &ops, line, highlighter);
         
