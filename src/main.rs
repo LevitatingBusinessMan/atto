@@ -12,6 +12,7 @@ mod model;
 mod view;
 mod parse;
 mod logging;
+mod themes;
 
 use logging::setup_logging;
 use view::View;
@@ -38,7 +39,8 @@ fn main() -> anyhow::Result<()> {
 
     tui::install_panic_hook();
 
-    let mut model = Model::new(buffers);
+    let theme_set = themes::theme_set()?;
+    let mut model = Model::new(buffers, theme_set);
 
     let mut event_state = handle_event::EventState::default();
 
@@ -51,7 +53,6 @@ fn main() -> anyhow::Result<()> {
     }
 
     tui::restore()?;
-
     Ok(())
 }
 

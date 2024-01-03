@@ -10,7 +10,7 @@ pub fn setup_logging() -> io::Result<()> {
         .with_line_number(true)
         .with_writer(file)
         .with_target(false)
-        .with_ansi(false);
+        .with_ansi(true);
     tracing_subscriber::registry().with(file_subscriber).init();
     Ok(())
 }

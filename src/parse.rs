@@ -43,7 +43,7 @@ pub fn parse_from<'a>(from: usize, mut lines: LinesWithEndings<'a>, limit: usize
         None => (0, CachedParseState::new(highlighter, syntax)),
     };
 
-    debug!("Start of parse is {} away from top({})", from-start, from);
+    //debug!("Start of parse is {} away from top({})", from-start, from);
 
     //lines.advance_by(start).unwrap();
 

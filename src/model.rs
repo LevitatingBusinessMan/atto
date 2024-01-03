@@ -32,8 +32,7 @@ pub enum UtilityWindow {
 }
 
 impl Model {
-
-    pub fn new<'a>(mut buffers: Vec<Buffer>) -> Model {
+    pub fn new<'a>(mut buffers: Vec<Buffer>, theme_set: ThemeSet) -> Model {
         let parse_caches = (|| {
             let mut map = HashMap::new();
             for buf in &buffers {
@@ -53,9 +52,9 @@ impl Model {
             cursor: (0,0),
             may_scroll: false,
             parse_caches,
-            theme_set: ThemeSet::load_defaults(),
-            syntax_set: SyntaxSet::load_defaults_newlines(),
-            theme: "base16-eighties.dark".to_owned(),
+            theme_set,
+            syntax_set,
+            theme: "dracula".to_owned(),
         }
     }
 
