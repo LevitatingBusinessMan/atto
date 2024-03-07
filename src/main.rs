@@ -14,6 +14,7 @@ mod view;
 mod parse;
 mod logging;
 mod themes;
+mod find;
 
 use logging::setup_logging;
 use view::View;

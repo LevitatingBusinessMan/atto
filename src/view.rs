@@ -106,8 +106,9 @@ impl View for Model {
             main[1]
         );
 
-        match self.utility {
+        match &self.utility {
             Some(UtilityWindow::Help) => render_help(f, utility_area),
+            Some(UtilityWindow::Find(find)) => find.view(&self, f, utility_area),
             None => {},
         }
     }

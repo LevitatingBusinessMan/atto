@@ -2,6 +2,7 @@ use std::{rc::Rc, collections::HashMap, cell::RefCell};
 
 use ratatui::{Frame, layout::{Layout, Constraint, Direction, Rect}, widgets::{Block, Paragraph, Borders, Wrap, Scrollbar, ScrollbarState}, style::{Style, Stylize}, text::Line, Terminal, backend::Backend};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
+use tracing::debug;
 
 use crate::{buffer::Buffer, parse::{ParseCache, self}};
 
@@ -29,6 +30,7 @@ pub struct Model {
 /// The top right window
 pub enum UtilityWindow {
     Help,
+    Find(crate::find::FindModel),
 }
 
 impl Model {
@@ -59,6 +61,21 @@ impl Model {
     }
 
     pub fn update(&mut self, msg: Message) -> Option<Message> {
+
+        debug!("{msg:?}");
+
+        match &mut self.utility {
+            Some(UtilityWindow::Find(find)) => {
+                match msg {
+                    Message::Escape | Message::Quit | Message::Find(_) => {},
+                    _ => {
+                        return find.update(msg)
+                    }
+                }
+            },
+            _ => {}
+        }
+
         match msg {
             Message::NextBuffer => self.selected = (self.selected + 1) % self.buffers.len(),
             Message::PreviousBuffer => self.selected = (self.selected + self.buffers.len() - 1) % self.buffers.len(),
@@ -66,6 +83,7 @@ impl Model {
             Message::ScrollDown => self.current_buffer_mut().top += 1,
             Message::ScrollUp => self.current_buffer_mut().top = self.current_buffer_mut().top.checked_sub(1).unwrap_or_default(),
             Message::OpenHelp => self.utility = Some(UtilityWindow::Help),
+            Message::OpenFind => self.utility = Some(UtilityWindow::Find(crate::find::FindModel::new())),
             Message::Escape => {
                 if self.utility.is_some() {
                     self.utility = None;
@@ -105,6 +123,10 @@ impl Model {
             Message::GotoStartOfLine => self.current_buffer_mut().goto_start_of_line(),
             Message::GotoEndOfLine => self.current_buffer_mut().goto_end_of_line(),
             Message::Enter => return Some(Message::InsertChar('\n')),
+            Message::Find(query) => {
+                self.current_buffer_mut().find(query);
+                self.may_scroll = true;
+            }
         }
         None
     }
@@ -121,6 +143,8 @@ impl Model {
         return &self.theme_set.themes[&self.theme]
     }
 }
+
+#[derive(Debug)]
 pub enum Message {
     NextBuffer,
     PreviousBuffer,
@@ -128,6 +152,8 @@ pub enum Message {
     ScrollDown,
     ScrollUp,
     OpenHelp,
+    OpenFind,
+    Find(String),
     Escape,
     InsertChar(char),
     MoveLeft,

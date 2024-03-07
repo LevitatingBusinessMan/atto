@@ -1,6 +1,7 @@
-use std::{cmp, collections::HashMap};
+use std::{cmp, collections::HashMap, rc::Rc};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxReference};
 use anyhow::anyhow;
+use tracing::debug;
 
 use crate::parse::*;
 
@@ -17,6 +18,7 @@ pub struct Buffer {
     /// The cached parse states for this buffer
     pub parse_cache: HashMap<usize, CachedParseState>,
     pub syntax: Option<SyntaxReference>,
+    pub highlights: Vec<(usize, usize)>,
 }
 
 impl Buffer {
@@ -30,6 +32,7 @@ impl Buffer {
             prefered_col: None,
             parse_cache: HashMap::new(),
             syntax: None,
+            highlights: vec![],
         }
     }
 
@@ -43,6 +46,7 @@ impl Buffer {
             prefered_col: None,
             parse_cache: HashMap::new(),
             syntax: None,
+            highlights: vec![],
         }
     }
 
@@ -182,6 +186,19 @@ impl Buffer {
         // invalidating from top is faster than figuring out the current line
         // and you render from the top anyway
         self.parse_cache.invalidate_from(self.top);
+    }
+
+    pub fn find(&mut self, query: String) {
+        let matches: Vec<_> = self.content.match_indices(&query).map(|(start, match_)| {
+            (start, start + match_.len())
+        }).collect();
+
+        // scroll to first match
+        if let Some((start, _end)) = matches.iter().find(|(start, _end)| start >= &self.position) {
+            self.position = *start
+        }
+
+        self.highlights = matches;
     }
 
     // Tries to find and set a syntax
