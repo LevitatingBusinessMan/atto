@@ -7,7 +7,7 @@ use ratatui::text::{Span, Line};
 use syntect::parsing::{ParseState, SyntaxReference, ScopeStack, SyntaxSet};
 use syntect::highlighting::{HighlightState, Theme, Highlighter, HighlightIterator};
 use syntect::util::LinesWithEndings;
-use syntect_tui::{SyntectTuiError, into_span};
+use crate::syntect_tui::{self, into_span, SyntectTuiError};
 use tracing::{debug, debug_span};
 
 const CACHE_FREQUENCY: usize = 30;

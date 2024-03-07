@@ -15,6 +15,7 @@ mod parse;
 mod logging;
 mod themes;
 mod find;
+mod syntect_tui;
 
 use logging::setup_logging;
 use view::View;
