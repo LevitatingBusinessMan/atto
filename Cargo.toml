@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 description = "An experimental terminal text editor"
 license = "MIT"
+authors = ["Rein Fernhout"]
+homepage = "https://github.com/LevitatingBusinessMan/atto"
+repository = "https://github.com/LevitatingBusinessMan/atto"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
