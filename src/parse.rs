@@ -7,6 +7,7 @@ use ratatui::text::{Span, Line};
 use syntect::parsing::{ParseState, SyntaxReference, ScopeStack, SyntaxSet};
 use syntect::highlighting::{HighlightState, Highlighter, HighlightIterator};
 use syntect::util::LinesWithEndings;
+use tracing::instrument;
 use crate::syntect_tui::{self, SyntectTuiError};
 
 const CACHE_FREQUENCY: usize = 30;
@@ -35,6 +36,7 @@ impl ParseCacheTrait for ParseCache {
     }
 }
 
+#[tracing::instrument(skip_all, level="trace")]
 pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, cache: &mut HashMap<usize, CachedParseState>, highlighter: &Highlighter, syntax: &SyntaxReference, syntax_set: &SyntaxSet) 
 -> anyhow::Result<Vec<Line<'a>>> {
     let (start, mut state) = match cache.closest_state(from) {

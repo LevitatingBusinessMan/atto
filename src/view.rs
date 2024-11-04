@@ -12,6 +12,7 @@ pub trait View {
 }
 
 impl View for Model {
+    #[tracing::instrument(skip_all, level="trace")]
     fn view(&mut self, f: &mut Frame) {
         let main = Layout::default()
                 .direction(Direction::Vertical)

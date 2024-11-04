@@ -2,7 +2,7 @@ use std::{fs, io};
 use dirs;
 
 use tracing::{info, Level};
-use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{fmt::{format::FmtSpan, writer::MakeWriterExt}, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
     let file = fs::File::options()
@@ -15,7 +15,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
             )
         )?;
 
-    let level = if args.debug || cfg!(debug_assertions) { Level::DEBUG } else { Level::WARN };
+    let level = if args.debug || cfg!(debug_assertions) { Level::TRACE } else { Level::WARN };
 
     tracing_subscriber::fmt()
         .with_line_number(true)
@@ -23,6 +23,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
         .with_target(true)
         .with_ansi(true)
         .with_max_level(level)
+        .with_span_events(FmtSpan::CLOSE)
         .init();
 
     Ok(())
