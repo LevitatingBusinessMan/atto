@@ -116,6 +116,16 @@ impl Model {
                 self.current_buffer_mut().move_down();
                 self.may_scroll = true;
             },
+            Message::PageUp => {
+                let height = self.viewport.height as usize;
+                self.current_buffer_mut().page_up(height);
+                // self.may_scroll = true;
+            },
+            Message::PageDown => {
+                let height = self.viewport.height as usize;
+                self.current_buffer_mut().page_down(height);
+                // self.may_scroll = true;
+            },
             Message::Backspace => {
                 let cur = self.current_buffer_mut();
                 if cur.position > 0 {
@@ -188,6 +198,8 @@ pub enum Message {
     MoveRight,
     MoveUp,
     MoveDown,
+    PageUp,
+    PageDown,
     Backspace,
     Delete,
     JumpWordLeft,

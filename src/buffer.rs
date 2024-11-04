@@ -1,5 +1,6 @@
 use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
+use tracing::debug;
 
 use crate::parse::*;
 
@@ -61,7 +62,7 @@ impl Buffer {
         self.read_only = ro;
     }
 
-    /// Get position as column and row
+    /// Get position as column and row (of the total buffer not the viewport)
     pub fn cursor_pos(&self) -> (u16, u16) {
         let mut row = 0;
         let mut col = 0;
@@ -116,6 +117,14 @@ impl Buffer {
         } else {
             self.position = self.content.len();
         }
+    }
+
+    pub fn page_up(&mut self, height: usize) {
+        self.top = self.top.saturating_sub(height);
+    }
+    
+    pub fn page_down(&mut self, height: usize) {
+        self.top = cmp::min(self.top + height - 1, self.content.lines().count() - height);
     }
 
     fn start_of_next_line(&self) -> Option<usize> {

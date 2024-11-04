@@ -72,6 +72,8 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
     if key.kind == crossterm::event::KeyEventKind::Press || key.kind == crossterm::event::KeyEventKind::Repeat {
         if key.modifiers.contains(KeyModifiers::ALT) {
             match key.code {
+                KeyCode::Char('u') => Some(Message::PageUp),
+                KeyCode::Char('p') => Some(Message::PageDown),
                 KeyCode::Char('i') => Some(Message::MoveUp),
                 KeyCode::Char('n') => Some(Message::MoveDown),
                 KeyCode::Char('j') => {
