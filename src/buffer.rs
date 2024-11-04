@@ -1,7 +1,5 @@
-use std::{cmp, collections::HashMap, rc::Rc};
+use std::{cmp, collections::HashMap, fs::{self, File}, io::{self, Read, Write}, os::unix::fs::FileExt, rc::Rc, sync::{Arc, Mutex}};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxReference};
-use anyhow::anyhow;
-use tracing::debug;
 
 use crate::parse::*;
 
@@ -9,6 +7,7 @@ use crate::parse::*;
 pub struct Buffer {
     pub name: String,
     pub content: String,
+    pub file: Option<Arc<File>>,
     pub position: usize,
     pub read_only: bool,
     /// How far the buffer is scrolled
@@ -22,10 +21,13 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn new(name: String, content: String) -> Self {
+    pub fn new(name: String, mut file: File) -> Self {
+        let mut content = String::new();
+        file.read_to_string(&mut content).unwrap();
         return Self {
             name,
-            content,
+            content: content,
+            file: Some(Arc::new(file)),
             position: 0,
             read_only: false,
             top: 0,
@@ -40,6 +42,7 @@ impl Buffer {
         return Self {
             name: "Unknown".to_string(),
             content: String::new(),
+            file: None,
             position: 0,
             read_only: false,
             top: 0,
@@ -238,6 +241,20 @@ impl Buffer {
             self.syntax = Some(syntax.clone());
         }
         syntax
+    }
+
+    /// save to disk
+    pub fn save(&mut self) -> io::Result<()> {
+        if let Some(file) = &self.file {
+            file.write_all_at(self.content.as_bytes(), 0)?;
+            file.sync_all()?;
+        } else {
+            let file = File::options().create(true).write(true).open(self.name.clone())?;
+            file.write_all_at(self.content.as_bytes(), 0)?;
+            file.sync_all()?;
+            self.file = Some(Arc::new(file));
+        }
+        Ok(())
     }
 
 }

@@ -137,6 +137,13 @@ impl Model {
             Message::Find(query) => {
                 self.current_buffer_mut().find(query);
                 self.may_scroll = true;
+            },
+            Message::Save => {
+                // TODO any error here should be displayed
+                if let Err(e) =  self.current_buffer_mut().save() {
+                    tracing::error!("{:?}", e);
+                    unimplemented!();
+                }
             }
         }
         None
@@ -178,4 +185,5 @@ pub enum Message {
     GotoStartOfLine,
     GotoEndOfLine,
     Enter,
+    Save,
 }

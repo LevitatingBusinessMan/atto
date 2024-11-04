@@ -2,7 +2,7 @@
 #![feature(io_error_more)]
 #![feature(iter_advance_by)]
 #![feature(let_chains)]
-use std::{io, fs, path::{Path, self}};
+use std::{io, fs};
 
 use clap::Parser;
 use anyhow;
@@ -62,7 +62,7 @@ fn main() -> anyhow::Result<()> {
 fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer>> {
     files.iter().map(|f| Ok(Buffer::new(
             f.clone(),
-            fs::read_to_string(f)?
+            fs::File::options().create(true).read(true).write(true).open(f)?
     ))).collect()
 }
 mod tui {

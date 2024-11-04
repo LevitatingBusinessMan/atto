@@ -102,6 +102,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Right => Some(Message::NextBuffer),
                 KeyCode::Left => Some(Message::PreviousBuffer),
                 KeyCode::Char('q') => Some(Message::Quit),
+                KeyCode::Char('s') => Some(Message::Save),
                 KeyCode::Char('g') => Some(Message::OpenHelp),
                 KeyCode::Char('f') => Some(Message::OpenFind),
                 _ => None,
