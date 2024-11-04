@@ -15,8 +15,6 @@ pub struct Model {
     pub running: bool,
     /// The utility window
     pub utility: Option<UtilityWindow>,
-    /// Where should the cursor be drawn
-    pub cursor: (u16, u16),
     /// Tell the view it may have to scroll
     /// the buffer because the cursor might've moved 
     /// out of view; 
@@ -53,7 +51,6 @@ impl Model {
             selected: 0,
             running: true,
             utility: None,
-            cursor: (0,0),
             may_scroll: false,
             parse_caches,
             theme_set,
