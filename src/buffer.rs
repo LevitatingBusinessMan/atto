@@ -1,6 +1,6 @@
 use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::parse::*;
 
@@ -277,6 +277,7 @@ impl Buffer {
         let mut file = binding.lock().unwrap();
         file.rewind()?;
         file.write_all(self.content.as_bytes())?;
+        file.set_len(self.content.len() as u64)?;
         file.flush()?;
 
         info!("Wrote {} bytes to {}", self.content.as_bytes().len(), self.name);
