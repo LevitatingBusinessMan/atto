@@ -2,7 +2,7 @@
 #![feature(io_error_more)]
 #![feature(iter_advance_by)]
 #![feature(let_chains)]
-use std::{io, fs};
+use std::{fs, io, path::PathBuf};
 
 use clap::Parser;
 use anyhow;
@@ -18,21 +18,26 @@ mod find;
 mod syntect_tui;
 
 use logging::setup_logging;
+use tracing::info;
 use view::View;
 use model::Model;
 use handle_event::handle_event;
 use buffer::Buffer;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 struct Args {
+    #[arg(long, help="enable verbose debugging")]
+    debug: bool,
+    #[arg(long, help="use an alternative logfile path")]
+    logfile: Option<PathBuf>,
     files: Option<Vec<String>>
 }
 
 fn main() -> anyhow::Result<()> {
-
-    let _ = setup_logging();
-
     let args = Args::parse();
+    let _ = setup_logging(&args);
+    info!("Launched with {args:?}");
+
     let buffers = match args.files {
         Some(files) => read_files(files),
         None => io::Result::Ok(vec![Buffer::empty()]),

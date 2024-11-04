@@ -49,8 +49,6 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
     // If a movement key is held (so space can jump in that direction)
     if let KeyCode::Char('j') | KeyCode::Char('f') = key.code {
         if let KeyCode::Char(char) = key.code {
-            debug!("{char}");
-            debug!("{char}");
             match key.kind {
                 event::KeyEventKind::Press => {
                     debug!("movement_key_down = {char}");
