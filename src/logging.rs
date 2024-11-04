@@ -8,6 +8,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
     let file = fs::File::options()
         .write(true)
         .append(true)
+        .create(true)
         .open(
             args.logfile.clone().unwrap_or(
                 dirs::cache_dir().ok_or_else(|| io::Error::other("failed to find cache dir"))?
