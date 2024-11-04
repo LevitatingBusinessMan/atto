@@ -1,8 +1,8 @@
 use std::{fs, io};
 use dirs;
 
-use tracing::{info, Level};
-use tracing_subscriber::{fmt::{format::FmtSpan, writer::MakeWriterExt}, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing::Level;
+use tracing_subscriber::{fmt::{format::FmtSpan, writer::MakeWriterExt}, util::SubscriberInitExt};
 
 pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
     let file = fs::File::options()
