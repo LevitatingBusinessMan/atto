@@ -69,6 +69,7 @@ impl Buffer {
         let mut linestart = newlineiter.next().unwrap_or(0);
         if linestart == 0 { linestart = 0 } else { linestart += 1 };
         self.position = cmp::min(cmp::min(linestart + x as usize, newlineiter.next().unwrap_or(usize::MAX)), self.content.len());
+        self.prefered_col = Some(x as usize);
     }
 
     /// Get position as column and row (of the total buffer not the viewport)
@@ -129,11 +130,17 @@ impl Buffer {
     }
 
     pub fn page_up(&mut self, height: usize) {
+        let (col, mut row) = self.cursor_pos();
+        row -= self.top as u16;
         self.top = self.top.saturating_sub(height);
+        self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
     }
     
     pub fn page_down(&mut self, height: usize) {
+        let (col, mut row) = self.cursor_pos();
+        row -= self.top as u16;
         self.top = cmp::min(self.top + height - 1, self.content.lines().count() - height);
+        self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
     }
 
     fn start_of_next_line(&self) -> Option<usize> {
