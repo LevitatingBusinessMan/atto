@@ -147,17 +147,21 @@ impl Buffer {
     }
 
     pub fn move_word_left(&mut self) {
-        if self.current_char().is_whitespace() {
-            while self.current_char().is_whitespace() && self.position > 0 && self.start_of_line() != self.position {
+        let mut next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
+        if next.is_whitespace() {
+            while next.is_whitespace() && self.position > 0 && self.start_of_line() != self.position {
                 self.position -= 1;
+                next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
             }
-        } else if self.current_char().is_alphanumeric() {
-            while (self.current_char().is_alphanumeric() || self.current_char() == '_') && self.position > 0 && self.start_of_line() != self.position {
+        } else if next.is_alphanumeric() {
+            while (next.is_alphanumeric() || next == '_') && self.position > 0 && self.start_of_line() != self.position {
                 self.position -= 1;
+                next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
             }
         } else {
-            while !self.current_char().is_alphanumeric()  && !self.current_char().is_whitespace() && self.position > 0 && self.start_of_line() != self.position {
+            while !next.is_alphanumeric()  && !next.is_whitespace() && self.position > 0 && self.start_of_line() != self.position {
                 self.position -= 1;
+                next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
             }
         }
         self.prefered_col = None;
@@ -169,11 +173,11 @@ impl Buffer {
                 self.position += 1;
             }
         } else if self.current_char().is_alphanumeric() {
-            while (self.current_char().is_alphanumeric() || self.current_char() == '_') && self.position+1 != self.content.len() && self.current_char() != '\n' {
+            while (self.current_char().is_alphanumeric() || self.current_char() == '_') && self.position+1 != self.content.len() {
                 self.position += 1;
             }
         } else {
-            while !self.current_char().is_alphanumeric()  && !self.current_char().is_whitespace() && self.position+1 != self.content.len() && self.current_char() != '\n' {
+            while !self.current_char().is_alphanumeric()  && !self.current_char().is_whitespace() && self.position+1 != self.content.len() {
                 self.position += 1;
             }
         }
