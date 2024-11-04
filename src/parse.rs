@@ -10,7 +10,7 @@ use syntect::util::LinesWithEndings;
 use tracing::instrument;
 use crate::syntect_tui::{self, SyntectTuiError};
 
-const CACHE_FREQUENCY: usize = 100;
+const CACHE_FREQUENCY: usize = 10;
 pub const TABSIZE: usize = 4;
 
 
@@ -36,7 +36,7 @@ impl ParseCacheTrait for ParseCache {
     }
 }
 
-#[tracing::instrument(skip_all, level="trace", fields(start, from = from))]
+#[tracing::instrument(skip_all, level="trace", fields(start, limit = limit, from = from, n))]
 pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, cache: &mut HashMap<usize, CachedParseState>, highlighter: &Highlighter, syntax: &SyntaxReference, syntax_set: &SyntaxSet) 
 -> anyhow::Result<Vec<Line<'a>>> {
     let (start, mut state) = match cache.closest_state(from) {
@@ -44,7 +44,7 @@ pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, ca
         None => (0, CachedParseState::new(highlighter, syntax)),
     };
 
-    tracing::Span::current().record("start", start);
+    tracing::Span::current().record("start", start).record("n", from + limit - start);
 
     let mut lexemes: Vec<Line<'a>> = vec![];
 
@@ -98,3 +98,4 @@ impl CachedParseState {
         }
     }
 }
+
