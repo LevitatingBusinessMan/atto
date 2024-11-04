@@ -2,6 +2,7 @@
 #![feature(io_error_more)]
 #![feature(iter_advance_by)]
 #![feature(let_chains)]
+#![feature(panic_payload_as_str)]
 use std::{fs, io, path::PathBuf};
 
 use clap::Parser;
@@ -104,10 +105,11 @@ mod tui {
 
     pub fn install_panic_hook() {
         let original_hook = panic::take_hook();
-        panic::set_hook(Box::new(move |panic_info| {
+        panic::set_hook(Box::new(move |info| {
             stdout().execute(LeaveAlternateScreen).unwrap();
             disable_raw_mode().unwrap();
-            original_hook(panic_info);
+            tracing::error!("PANIC at {}: {}", info.location().unwrap(), info.payload_as_str().unwrap_or(""));
+            original_hook(info);
         }));
     }
 }
