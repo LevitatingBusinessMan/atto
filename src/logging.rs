@@ -5,12 +5,15 @@ use tracing::{info, Level};
 use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
-    let file = fs::File::create(
-        args.logfile.clone().unwrap_or(
-            dirs::cache_dir().ok_or_else(|| io::Error::other("failed to find cache dir"))?
-            .join("atto.log")
-        )
-    )?;
+    let file = fs::File::options()
+        .write(true)
+        .append(true)
+        .open(
+            args.logfile.clone().unwrap_or(
+                dirs::cache_dir().ok_or_else(|| io::Error::other("failed to find cache dir"))?
+                .join("atto.log")
+            )
+        )?;
 
     let level = if args.debug || cfg!(debug_assertions) { Level::DEBUG } else { Level::WARN };
 

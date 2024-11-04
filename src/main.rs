@@ -24,6 +24,9 @@ use model::Model;
 use handle_event::handle_event;
 use buffer::Buffer;
 
+#[cfg(all(feature = "onig", feature = "fancy_regex"))]
+compile_error!("feature \"onig\" and feature \"fancy_regex\" cannot be enabled at the same time");
+
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(long, help="enable verbose debugging")]
