@@ -247,13 +247,15 @@ impl Buffer {
     /// save to disk
     pub fn save(&mut self) -> io::Result<()> {
         if let Some(file) = &self.file {
-            let file = file.lock().unwrap();
-            file.write_all_at(self.content.as_bytes(), 0)?;
-            file.sync_all()?;
+            let mut file = file.lock().unwrap();
+            file.rewind()?;
+            file.write_all(self.content.as_bytes())?;
+            file.flush()?;
         } else {
-            let file = File::options().create(true).write(true).open(self.name.clone())?;
-            file.write_all_at(self.content.as_bytes(), 0)?;
-            file.sync_all()?;
+            let mut file = File::options().create(true).write(true).open(self.name.clone())?;
+            file.rewind()?;
+            file.write_all(self.content.as_bytes())?;
+            file.flush()?;
             self.file = Some(Arc::new(Mutex::new(file)));
         }
         Ok(())

@@ -43,15 +43,16 @@ fn main() -> anyhow::Result<()> {
     tui::install_panic_hook();
 
     let theme_set = themes::theme_set()?;
-    let mut model = Model::new(buffers, theme_set);
+    let mut model = Model::new(buffers, theme_set, terminal.size().unwrap());
 
     let mut event_state = handle_event::EventState::default();
 
+    terminal.draw(|frame| model.view(frame))?;
     while model.running {
-        terminal.draw(|frame| model.view(frame))?;
         let mut msg = handle_event(&model, &mut event_state)?;
         while msg.is_some() {
             msg = model.update(msg.unwrap());
+            terminal.draw(|frame| model.view(frame))?;
         }
     }
 

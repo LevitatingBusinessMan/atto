@@ -1,6 +1,7 @@
-use std::{rc::Rc, collections::HashMap, cell::RefCell};
+use std::{cell::RefCell, cmp, collections::HashMap, rc::Rc};
 
-use ratatui::{Frame, layout::{Layout, Constraint, Direction, Rect}, widgets::{Block, Paragraph, Borders, Wrap, Scrollbar, ScrollbarState}, style::{Style, Stylize}, text::Line, Terminal, backend::Backend};
+use crossterm::terminal;
+use ratatui::{backend::Backend, layout::{Constraint, Direction, Layout, Rect, Size}, style::{Style, Stylize}, text::Line, widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarState, Wrap}, Frame, Terminal};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::debug;
 
@@ -25,6 +26,7 @@ pub struct Model {
     pub theme_set: ThemeSet,
     pub syntax_set: SyntaxSet,
     pub theme: String,
+    pub viewport: Size,
 }
 
 /// The top right window
@@ -34,7 +36,7 @@ pub enum UtilityWindow {
 }
 
 impl Model {
-    pub fn new<'a>(mut buffers: Vec<Buffer>, theme_set: ThemeSet) -> Model {
+    pub fn new<'a>(mut buffers: Vec<Buffer>, theme_set: ThemeSet, viewport: Size) -> Model {
         let parse_caches = (|| {
             let mut map = HashMap::new();
             for buf in &buffers {
@@ -42,6 +44,7 @@ impl Model {
             }
             map
         })();
+
         let syntax_set = SyntaxSet::load_defaults_newlines();
         for buffer in &mut buffers {
             buffer.find_syntax(&syntax_set);
@@ -57,6 +60,7 @@ impl Model {
             theme_set,
             syntax_set,
             theme: "dracula".to_owned(),
+            viewport,
         }
     }
 
@@ -80,7 +84,11 @@ impl Model {
             Message::NextBuffer => self.selected = (self.selected + 1) % self.buffers.len(),
             Message::PreviousBuffer => self.selected = (self.selected + self.buffers.len() - 1) % self.buffers.len(),
             Message::Quit => self.running = false,
-            Message::ScrollDown => self.current_buffer_mut().top += 1,
+            Message::ScrollDown => {
+                if (self.current_buffer().content.lines().count() - self.viewport.height as usize) > self.current_buffer_mut().top {
+                 self.current_buffer_mut().top += 1;
+                }
+            },
             Message::ScrollUp => self.current_buffer_mut().top = self.current_buffer_mut().top.checked_sub(1).unwrap_or_default(),
             Message::OpenHelp => self.utility = Some(UtilityWindow::Help),
             Message::OpenFind => self.utility = Some(UtilityWindow::Find(crate::find::FindModel::new())),
@@ -144,7 +152,10 @@ impl Model {
                     tracing::error!("{:?}", e);
                     unimplemented!();
                 }
-            }
+            },
+            Message::Resize(x, y) => {
+                self.viewport = (x,y).into();
+            },
         }
         None
     }
@@ -186,4 +197,5 @@ pub enum Message {
     GotoEndOfLine,
     Enter,
     Save,
+    Resize(u16, u16),
 }
