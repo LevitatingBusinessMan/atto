@@ -1,5 +1,6 @@
-use std::{cmp, collections::HashMap, fs::{self, File}, io::{self, Read, Write}, os::unix::fs::FileExt, rc::Rc, sync::{Arc, Mutex}};
+use std::{cmp, collections::HashMap, fs::{self, File}, io::{self, Read, Seek, Write}, os::unix::fs::FileExt, rc::Rc, sync::{Arc, Mutex}};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxReference};
+use tracing::field::debug;
 
 use crate::parse::*;
 
@@ -7,7 +8,7 @@ use crate::parse::*;
 pub struct Buffer {
     pub name: String,
     pub content: String,
-    pub file: Option<Arc<File>>,
+    pub file: Option<Arc<Mutex<File>>>,
     pub position: usize,
     pub read_only: bool,
     /// How far the buffer is scrolled
@@ -27,7 +28,7 @@ impl Buffer {
         return Self {
             name,
             content: content,
-            file: Some(Arc::new(file)),
+            file: Some(Arc::new(Mutex::new(file))),
             position: 0,
             read_only: false,
             top: 0,
@@ -246,15 +247,29 @@ impl Buffer {
     /// save to disk
     pub fn save(&mut self) -> io::Result<()> {
         if let Some(file) = &self.file {
+            let file = file.lock().unwrap();
             file.write_all_at(self.content.as_bytes(), 0)?;
             file.sync_all()?;
         } else {
             let file = File::options().create(true).write(true).open(self.name.clone())?;
             file.write_all_at(self.content.as_bytes(), 0)?;
             file.sync_all()?;
-            self.file = Some(Arc::new(file));
+            self.file = Some(Arc::new(Mutex::new(file)));
         }
         Ok(())
+    }
+
+    pub fn dirty(&self) -> io::Result<bool> {
+        match &self.file {
+            Some(file) => {
+                let mut filecontent = String::new();
+                let mut file = file.lock().unwrap();
+                file.rewind()?;
+                file.read_to_string(&mut filecontent)?;
+                Ok(filecontent != self.content)
+            },
+            None => Ok(self.content.is_empty()),
+        }
     }
 
 }
