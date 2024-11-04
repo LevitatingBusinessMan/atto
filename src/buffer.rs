@@ -146,6 +146,23 @@ impl Buffer {
         return Some(0);
     }
 
+    pub fn move_word_left(&mut self) {
+        if self.current_char().is_whitespace() {
+            while self.current_char().is_whitespace() && self.position > 0 && self.start_of_line() != self.position {
+                self.position -= 1;
+            }
+        } else if self.current_char().is_alphanumeric() {
+            while (self.current_char().is_alphanumeric() || self.current_char() == '_') && self.position > 0 && self.start_of_line() != self.position {
+                self.position -= 1;
+            }
+        } else {
+            while !self.current_char().is_alphanumeric()  && !self.current_char().is_whitespace() && self.position > 0 && self.start_of_line() != self.position {
+                self.position -= 1;
+            }
+        }
+        self.prefered_col = None;
+    }
+
     pub fn move_word_right(&mut self) {
         if self.current_char().is_whitespace() {
             while self.current_char().is_whitespace() && self.position+1 != self.content.len() && self.current_char() != '\n' {

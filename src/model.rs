@@ -116,6 +116,10 @@ impl Model {
                     return Some(Message::MoveLeft);
                 }
             },
+            Message::JumpWordLeft => {
+                self.current_buffer_mut().move_word_left();
+                self.may_scroll = true;
+            },
             Message::JumpWordRight => {
                 self.current_buffer_mut().move_word_right();
                 self.may_scroll = true;
@@ -161,6 +165,7 @@ pub enum Message {
     MoveUp,
     MoveDown,
     Backspace,
+    JumpWordLeft,
     JumpWordRight,
     GotoStartOfLine,
     GotoEndOfLine,

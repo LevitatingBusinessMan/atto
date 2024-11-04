@@ -46,11 +46,25 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
     }
 
     // If a movement key is held (so space can jump in that direction)
-    if key.code == KeyCode::Char('j') {
-        if let Some('j') = state.movement_key_down && key.kind == crossterm::event::KeyEventKind::Release {
-            state.movement_key_down = None;
-        } else if key.kind == crossterm::event::KeyEventKind::Press {
-            state.movement_key_down = Some('j');
+    if let KeyCode::Char('j') | KeyCode::Char('f') = key.code {
+        if let KeyCode::Char(char) = key.code {
+            debug!("{char}");
+            debug!("{char}");
+            match key.kind {
+                event::KeyEventKind::Press => {
+                    debug!("movement_key_down = {char}");
+                    state.movement_key_down = Some(char);
+                },
+                event::KeyEventKind::Release => {
+                    if let Some(current) = state.movement_key_down {
+                        if current == char {
+                    debug!("movement_key_down = None");
+                            state.movement_key_down = None;
+                        }
+                    }
+                },
+                event::KeyEventKind::Repeat => {},
+            }
         }
     }
 
@@ -66,17 +80,21 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                         Some(Message::MoveRight)
                     }
                 },
-                KeyCode::Char('f') => Some(Message::MoveLeft),
+                KeyCode::Char('f') => {
+                    if state.space_down || key.modifiers.contains(KeyModifiers::CONTROL) {
+                        Some(Message::JumpWordLeft)
+                    } else {
+                        Some(Message::MoveLeft)
+                    }
+                },
                 KeyCode::Char('a') => Some(Message::GotoStartOfLine),
                 KeyCode::Char('e') => Some(Message::GotoEndOfLine),
                 // Reverse word jumping
-                KeyCode::Char(' ') => {
-                    if let Some('j') = state.movement_key_down {
-                        Some(Message::JumpWordRight)
-                    } else {
-                        None
-                    }
-                }
+                KeyCode::Char(' ') => match state.movement_key_down {
+                    Some('j') => Some(Message::JumpWordRight),
+                    Some('f') => Some(Message::JumpWordLeft),
+                    _ => None,
+                },
                 _ => None
             }
         } else if key.modifiers.contains(KeyModifiers::CONTROL) {
