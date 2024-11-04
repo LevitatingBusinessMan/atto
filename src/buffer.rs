@@ -131,14 +131,14 @@ impl Buffer {
 
     pub fn page_up(&mut self, height: usize) {
         let (col, mut row) = self.cursor_pos();
-        row -= self.top as u16;
+        row = row.saturating_sub(self.top as u16);
         self.top = self.top.saturating_sub(height);
         self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
     }
     
     pub fn page_down(&mut self, height: usize) {
         let (col, mut row) = self.cursor_pos();
-        row -= self.top as u16;
+        row = row.saturating_sub(self.top as u16);
         self.top = cmp::min(self.top + height - 1, self.content.lines().count().saturating_sub(height));
         self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
     }
