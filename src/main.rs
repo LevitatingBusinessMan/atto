@@ -5,7 +5,7 @@
 #![feature(panic_payload_as_str)]
 use std::{fs, io, path::PathBuf};
 
-use clap::Parser;
+use clap::{Parser, crate_version};
 use anyhow;
 
 mod buffer;
@@ -28,7 +28,16 @@ use buffer::Buffer;
 #[cfg(all(feature = "onig", feature = "fancy_regex"))]
 compile_error!("feature \"onig\" and feature \"fancy_regex\" cannot be enabled at the same time");
 
+static HELP_TEMPLATE: &'static str = "\
+{usage-heading} {usage}
+
+{all-args}
+
+{name} {version} by {author}
+";
+
 #[derive(Parser, Debug)]
+#[command(author, help_template=HELP_TEMPLATE, version=crate_version!())]
 struct Args {
     #[arg(long, help="enable verbose debugging")]
     debug: bool,
@@ -113,3 +122,4 @@ mod tui {
         }));
     }
 }
+

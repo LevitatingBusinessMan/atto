@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "An experimental terminal text editor"
 license = "MIT"
-authors = ["Rein Fernhout"]
+authors = ["LevitatingBusinessMan"]
 homepage = "https://github.com/LevitatingBusinessMan/atto"
 repository = "https://github.com/LevitatingBusinessMan/atto"
 
@@ -17,7 +17,7 @@ fancy_regex = ["syntect/default-fancy"]
 
 [dependencies]
 anyhow = "1.0.76"
-clap = { version = "4.4.11", features = ["derive"] }
+clap = { version = "4.5", features = ["derive", "cargo"] }
 color-eyre = "0.6.2"
 crossterm = "0.28"
 custom_error = "1.9.2"
