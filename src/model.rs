@@ -165,6 +165,9 @@ impl Model {
             Message::Resize(x, y) => {
                 self.viewport = (x,y).into();
             },
+            Message::MouseLeft(x, y) => {
+                self.current_buffer_mut().set_viewport_cursor_pos(x, y);
+            }
         }
         None
     }
@@ -209,4 +212,5 @@ pub enum Message {
     Enter,
     Save,
     Resize(u16, u16),
+    MouseLeft(u16, u16),
 }

@@ -1,7 +1,7 @@
 use std::time;
 
 use anyhow::Ok;
-use crossterm::event::{self, KeyModifiers, KeyCode};
+use crossterm::event::{self, KeyCode, KeyModifiers, MouseButton};
 use tracing::debug;
 
 use crate::model::{Model, Message};
@@ -133,6 +133,7 @@ fn handle_mouse(mouse: event::MouseEvent) -> Option<Message> {
     match mouse.kind {
         event::MouseEventKind::ScrollDown => Some(Message::ScrollDown),
         event::MouseEventKind::ScrollUp => Some(Message::ScrollUp),
+        event::MouseEventKind::Down(MouseButton::Left) => Some(Message::MouseLeft(mouse.column, mouse.row)),
         _ => None
     }
 }

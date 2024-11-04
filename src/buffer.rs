@@ -1,4 +1,5 @@
-use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}};
+use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}, usize};
+use ratatui::symbols::line;
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::debug;
 
@@ -60,6 +61,14 @@ impl Buffer {
 
     pub fn set_readonly(&mut self, ro: bool) {
         self.read_only = ro;
+    }
+
+    /// Set the position into the buffer based on a location on the viewport
+    pub fn set_viewport_cursor_pos(&mut self, x: u16, y: u16) {
+        let mut newlineiter = self.content.chars().enumerate().filter_map(|(i, c)| if c == '\n' || i == 0 {Some(i)} else {None}).skip(self.top + y as usize);
+        let mut linestart = newlineiter.next().unwrap_or(0);
+        if linestart == 0 { linestart = 0 } else { linestart += 1 };
+        self.position = cmp::min(cmp::min(linestart + x as usize, newlineiter.next().unwrap_or(usize::MAX)), self.content.len());
     }
 
     /// Get position as column and row (of the total buffer not the viewport)
