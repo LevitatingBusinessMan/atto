@@ -1,7 +1,7 @@
 use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}, usize};
 use ratatui::symbols::line;
 use syntect::parsing::{SyntaxSet, SyntaxReference};
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::parse::*;
 
@@ -263,18 +263,18 @@ impl Buffer {
 
     /// save to disk
     pub fn save(&mut self) -> io::Result<()> {
-        if let Some(file) = &self.file {
-            let mut file = file.lock().unwrap();
-            file.rewind()?;
-            file.write_all(self.content.as_bytes())?;
-            file.flush()?;
-        } else {
-            let mut file = File::options().create(true).write(true).open(self.name.clone())?;
-            file.rewind()?;
-            file.write_all(self.content.as_bytes())?;
-            file.flush()?;
+        if self.file.is_none() {
+            let file = File::options().create(true).write(true).open(self.name.clone())?;
             self.file = Some(Arc::new(Mutex::new(file)));
         }
+        let binding = self.file.clone().unwrap();
+        let mut file = binding.lock().unwrap();
+        file.rewind()?;
+        file.write_all(self.content.as_bytes())?;
+        file.flush()?;
+
+        info!("Wrote {} bytes to {}", self.content.as_bytes().len(), self.name);
+
         Ok(())
     }
 
