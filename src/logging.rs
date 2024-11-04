@@ -1,8 +1,8 @@
 use std::{fs, io};
 use dirs;
 
-use tracing::Level;
-use tracing_subscriber::{fmt::{format::FmtSpan, writer::MakeWriterExt}, util::SubscriberInitExt};
+use tracing::{info, level_filters::LevelFilter, Level};
+use tracing_subscriber::{fmt::{format::FmtSpan, writer::MakeWriterExt}, layer::SubscriberExt, Layer, Registry};
 
 pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
     let file = fs::File::options()
@@ -16,16 +16,22 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
             )
         )?;
 
-    let level = if args.debug || cfg!(debug_assertions) { Level::TRACE } else { Level::WARN };
+    let level = if args.debug || cfg!(debug_assertions) { Level::TRACE } else { Level::INFO };
 
-    tracing_subscriber::fmt()
+    let fmt_layer = tracing_subscriber::fmt::layer()
         .with_line_number(true)
         .with_writer(file)
         .with_target(true)
         .with_ansi(true)
-        .with_max_level(level)
         .with_span_events(FmtSpan::CLOSE)
-        .init();
+        .with_filter(LevelFilter::from_level(level));
+
+    let subscriber = Registry::default()
+        .with(fmt_layer);
+
+    let _ = tracing::subscriber::set_global_default(subscriber);
+
+    info!("log level is {level:?}");
 
     Ok(())
 }
