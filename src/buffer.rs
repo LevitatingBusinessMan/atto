@@ -1,6 +1,5 @@
-use std::{cmp, collections::HashMap, fs::{self, File}, io::{self, Read, Seek, Write}, os::unix::fs::FileExt, rc::Rc, sync::{Arc, Mutex}};
-use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxReference};
-use tracing::field::debug;
+use std::{cmp, collections::HashMap, fs::{File}, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}};
+use syntect::parsing::{SyntaxSet, SyntaxReference};
 
 use crate::parse::*;
 

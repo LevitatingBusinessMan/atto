@@ -1,12 +1,10 @@
 //! For rendering the model
 use std::{io::BufRead, cell::RefCell, rc::Rc};
 
-use anyhow::anyhow;
-use ratatui::{Frame, layout::{Direction, Constraint, Layout, Rect}, widgets::{Paragraph, Scrollbar, ScrollbarState, Wrap, Block, Borders, Clear}, text::{Line, Span}, style::{Style, Stylize}};
-use syntect::{util::LinesWithEndings, highlighting::{Highlighter, ThemeSet, Theme}, parsing::SyntaxSet};
-use tracing::debug;
+use ratatui::{Frame, layout::{Direction, Constraint, Layout, Rect}, widgets::{Paragraph, Scrollbar, ScrollbarState, Wrap, Block, Borders, Clear}, text::Line, style::{Style, Stylize}};
+use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
 
-use crate::{model::{Model, UtilityWindow, self}, parse::{parse_from, ParseCache}};
+use crate::{model::{Model, UtilityWindow}, parse::{parse_from, ParseCache}};
 use crate::buffer::Buffer;
 
 pub trait View {

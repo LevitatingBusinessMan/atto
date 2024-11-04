@@ -1,7 +1,7 @@
 use std::time;
 
 use anyhow::Ok;
-use crossterm::event::{self, KeyModifiers, KeyCode, ModifierKeyCode};
+use crossterm::event::{self, KeyModifiers, KeyCode};
 use tracing::debug;
 
 use crate::model::{Model, Message};

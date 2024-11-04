@@ -1,11 +1,10 @@
-use std::{cell::RefCell, cmp, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crossterm::terminal;
-use ratatui::{backend::Backend, layout::{Constraint, Direction, Layout, Rect, Size}, style::{Style, Stylize}, text::Line, widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarState, Wrap}, Frame, Terminal};
+use ratatui::layout::Size;
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::debug;
 
-use crate::{buffer::Buffer, parse::{ParseCache, self}};
+use crate::{buffer::Buffer, parse::{ParseCache}};
 
 pub struct Model {
     /// What buffer is selected

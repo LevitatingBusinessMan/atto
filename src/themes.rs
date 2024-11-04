@@ -1,4 +1,4 @@
-use std::{io::{self, Read, Cursor}};
+use std::io::{self, Cursor};
 
 use syntect::highlighting::ThemeSet;
 

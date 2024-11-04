@@ -1,7 +1,6 @@
-use std::{env, fs, io};
+use std::{fs, io};
 
-use tracing::instrument::WithSubscriber;
-use tracing_subscriber::{fmt::layer, Layer, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 pub fn setup_logging() -> io::Result<()> {
     let file = fs::File::create("atto.log")?;

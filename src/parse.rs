@@ -2,18 +2,16 @@
 
 use std::collections::HashMap;
 
-use ratatui::style::{Stylize, Style};
+use ratatui::style::Stylize;
 use ratatui::text::{Span, Line};
 use syntect::parsing::{ParseState, SyntaxReference, ScopeStack, SyntaxSet};
-use syntect::highlighting::{HighlightState, Theme, Highlighter, HighlightIterator};
+use syntect::highlighting::{HighlightState, Highlighter, HighlightIterator};
 use syntect::util::LinesWithEndings;
-use crate::syntect_tui::{self, into_span, SyntectTuiError};
-use tracing::{debug, debug_span};
+use crate::syntect_tui::{self, SyntectTuiError};
 
 const CACHE_FREQUENCY: usize = 30;
 pub const TABSIZE: usize = 4;
 
-use crate::buffer::Buffer;
 
 pub trait ParseCacheTrait {
     fn invalidate_from(&mut self, from: usize);
@@ -37,7 +35,7 @@ impl ParseCacheTrait for ParseCache {
     }
 }
 
-pub fn parse_from<'a>(from: usize, mut lines: LinesWithEndings<'a>, limit: usize, cache: &mut HashMap<usize, CachedParseState>, highlighter: &Highlighter, syntax: &SyntaxReference, syntax_set: &SyntaxSet) 
+pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, cache: &mut HashMap<usize, CachedParseState>, highlighter: &Highlighter, syntax: &SyntaxReference, syntax_set: &SyntaxSet) 
 -> anyhow::Result<Vec<Line<'a>>> {
     let (start, mut state) = match cache.closest_state(from) {
         Some((i, state)) => (i, state.clone()),
