@@ -1,5 +1,5 @@
 //! For rendering the model
-use std::{io::BufRead, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use ratatui::{Frame, layout::{Direction, Constraint, Layout, Rect}, widgets::{Paragraph, Scrollbar, ScrollbarState, Wrap, Block, Borders, Clear}, text::Line, style::{Style, Stylize}};
 use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
@@ -16,10 +16,10 @@ impl View for Model {
         let main = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(0), Constraint::Length(1)])
-                .split(f.size());
+                .split(f.area());
 
         let content_height = self.current_buffer().content.chars().filter(|c| *c == '\n').count();
-        let scrollbar_width = if content_height as u16 > f.size().height {1} else {0};
+        let scrollbar_width = if content_height as u16 > f.area().height {1} else {0};
 
         let buffer_and_scrollbar = Layout::default()
             .direction(Direction::Horizontal)
@@ -29,7 +29,7 @@ impl View for Model {
         let vertical_middle_split = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(f.size());
+            .split(f.area());
 
         let utility_area  = Layout::default()
             .direction(Direction::Horizontal)
@@ -61,6 +61,7 @@ impl View for Model {
         let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache, &self.syntax_set, self.theme()) {
             Ok(tokens) => Paragraph::new(tokens),
             Err(e) => {
+                tracing::error!("{:?}", e);
                 // TODO cover tabs here
                 Paragraph::new(current_buffer.content.as_str()).scroll((current_buffer.top as u16,0))
             },
@@ -72,11 +73,11 @@ impl View for Model {
         );
 
         if cursor_y >= self.current_buffer().top as u16 {
-            f.set_cursor(cursor_x, cursor_y - self.current_buffer().top as u16);
+            f.set_cursor_position((cursor_x, cursor_y - self.current_buffer().top as u16));
         }
 
         let scrollbar = Scrollbar::default();
-        let mut scrollbar_state = ScrollbarState::new(content_height.saturating_sub(f.size().height as usize))
+        let mut scrollbar_state = ScrollbarState::new(content_height.saturating_sub(f.area().height as usize))
         .position(self.current_buffer().top);
         
         if scrollbar_width > 0 {

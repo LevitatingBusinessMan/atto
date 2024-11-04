@@ -4,7 +4,7 @@ use ratatui::layout::Size;
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::debug;
 
-use crate::{buffer::Buffer, parse::{ParseCache}};
+use crate::{buffer::Buffer, parse::ParseCache};
 
 pub struct Model {
     /// What buffer is selected

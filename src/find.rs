@@ -25,7 +25,7 @@ impl FindModel {
 
         let layout = Layout::new(ratatui::layout::Direction::Vertical, [
             Constraint::Length(3),
-            Constraint::Length(1), /// Padding
+            Constraint::Length(1), // Padding
             Constraint::Min(0),
         ]).split(block.inner(area));
 

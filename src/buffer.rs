@@ -1,4 +1,4 @@
-use std::{cmp, collections::HashMap, fs::{File}, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}};
+use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 
 use crate::parse::*;
