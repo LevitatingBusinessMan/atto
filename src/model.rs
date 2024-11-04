@@ -116,6 +116,13 @@ impl Model {
                     return Some(Message::MoveLeft);
                 }
             },
+            Message::Delete => {
+                let cur = self.current_buffer_mut();
+                if cur.position < cur.content.len() {
+                    cur.content.remove(cur.position);
+                    return None;
+                }
+            },
             Message::JumpWordLeft => {
                 self.current_buffer_mut().move_word_left();
                 self.may_scroll = true;
@@ -165,6 +172,7 @@ pub enum Message {
     MoveUp,
     MoveDown,
     Backspace,
+    Delete,
     JumpWordLeft,
     JumpWordRight,
     GotoStartOfLine,

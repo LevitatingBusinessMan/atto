@@ -116,6 +116,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Up => Some(Message::MoveUp),
                 KeyCode::Down => Some(Message::MoveDown),
                 KeyCode::Backspace => Some(Message::Backspace),
+                KeyCode::Delete => Some(Message::Delete),
                 _ => None
             }
         }
