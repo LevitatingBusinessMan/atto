@@ -17,6 +17,7 @@ mod logging;
 mod themes;
 mod find;
 mod syntect_tui;
+mod notification;
 
 use logging::setup_logging;
 use tracing::info;

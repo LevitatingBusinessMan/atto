@@ -2,10 +2,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use color_eyre::owo_colors::OwoColorize;
-use ratatui::{Frame, layout::{Direction, Constraint, Layout, Rect}, widgets::{Paragraph, Scrollbar, ScrollbarState, Wrap, Block, Borders, Clear}, text::Line, style::{Style, Stylize}};
+use ratatui::{layout::{Alignment, Constraint, Direction, Layout, Rect}, style::{Style, Stylize}, text::{Line, Text}, widgets::{Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarState, Wrap}, Frame};
 use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
 
-use crate::{model::{Model, UtilityWindow}, parse::{parse_from, ParseCache}};
+use crate::{model::{Model, UtilityWindow}, notification, parse::{parse_from, ParseCache}};
 use crate::buffer::Buffer;
 
 /// files over this size might be handled differently (like not having a scrollbar)
@@ -18,6 +18,7 @@ pub trait View {
 impl View for Model {
     #[tracing::instrument(skip_all, level="trace")]
     fn view(&mut self, f: &mut Frame) {
+        // split between status bar and rest
         let main = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(0), Constraint::Length(1)])
@@ -121,6 +122,31 @@ impl View for Model {
             Some(UtilityWindow::Find(find)) => find.view(&self, f, utility_area),
             None => {},
         }
+
+        // render notification
+        if let Some(notification) = &self.notification {
+            let buffer = buffer_and_scrollbar[0];
+            let wrapped_content = textwrap::fill(&notification.content, buffer.width as usize);
+            let height = wrapped_content.lines().count().div_ceil(buffer.height as usize);
+            let mut area = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(height as u16)])
+                .split(buffer)[1];
+            // notifiations that take up no more than a single line
+            // are aligned to the right and only the text is colorized
+            let alignment = if height > 1 { Alignment::Left } else { Alignment::Right };
+            if height < 2 {
+                let width = wrapped_content.chars().count();
+                area = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Min(0), Constraint::Length(width as u16)])
+                    .split(area)[1];
+            }
+            let widget = Text::raw(wrapped_content)
+                .style(notification.style)
+                .alignment(alignment);
+            f.render_widget(widget, area);
+        }
     }
 }
 
@@ -162,4 +188,3 @@ C-e Command
         .wrap(Wrap { trim: false })
     , area);
 }
-

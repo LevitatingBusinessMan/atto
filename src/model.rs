@@ -1,10 +1,13 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
 
-use ratatui::layout::Size;
+use ratatui::{layout::Size, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::debug;
+use tracing_subscriber::filter::combinator::Not;
 
-use crate::{buffer::Buffer, parse::ParseCache};
+use crate::buffer::Buffer;
+use crate::parse::ParseCache;
+use crate::notification::Notification;
 
 pub struct Model {
     /// What buffer is selected
@@ -24,6 +27,7 @@ pub struct Model {
     pub syntax_set: SyntaxSet,
     pub theme: String,
     pub viewport: Size,
+    pub notification: Option<Notification>,
 }
 
 /// The top right window
@@ -57,6 +61,7 @@ impl Model {
             syntax_set,
             theme: "dracula".to_owned(),
             viewport,
+            notification: None,
         }
     }
 
@@ -69,11 +74,24 @@ impl Model {
                 match msg {
                     Message::Escape | Message::Quit | Message::Find(_) => {},
                     _ => {
+                        // this logic is off
+                        // the utility should not intercept (and remove) all
+                        // messages by default
+                        // it should intercept, and then return, remove or replace it
                         return find.update(msg)
                     }
                 }
             },
             _ => {}
+        }
+
+        // remove notification if elapsed
+        // (the handling of this makes it so that if the user does not somehow create a message)
+        // the notification will hang around
+        if let Some(notification) = &self.notification {
+            if notification.expired() {
+                self.notification = None;
+            }
         }
 
         match msg {
@@ -134,7 +152,6 @@ impl Model {
                 let cur = self.current_buffer_mut();
                 if cur.position < cur.content.len() {
                     cur.content.remove(cur.position);
-                    return None;
                 }
             },
             Message::JumpWordLeft => {
@@ -153,10 +170,17 @@ impl Model {
                 self.may_scroll = true;
             },
             Message::Save => {
-                // TODO any error here should be displayed
                 if let Err(e) =  self.current_buffer_mut().save() {
                     tracing::error!("{:?}", e);
-                    unimplemented!();
+                    return Some(Message::Notification(
+                        format!("Error writing file: {e:?}"),
+                        Style::new().bg(Color::Green).fg(Color::Black)
+                    ));
+                } else {
+                    return Some(Message::Notification(
+                        String::from("SAVED"),
+                        Style::new().bg(Color::Green).fg(Color::Black)
+                    ));
                 }
             },
             Message::Resize(x, y) => {
@@ -164,8 +188,11 @@ impl Model {
             },
             Message::MouseLeft(x, y) => {
                 self.current_buffer_mut().set_viewport_cursor_pos(x, y);
-            }
-        }
+            },
+            Message::Notification(content, style) => {
+                self.notification = Some(Notification::new(content, style));
+            },
+        }        
         None
     }
 
@@ -210,4 +237,5 @@ pub enum Message {
     Save,
     Resize(u16, u16),
     MouseLeft(u16, u16),
+    Notification(String, Style),
 }

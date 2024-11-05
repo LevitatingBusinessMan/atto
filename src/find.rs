@@ -47,6 +47,7 @@ impl FindModel {
         let occurences = Line::raw(occurences_str);
         f.render_widget(occurences, layout[2]);
     }
+
     pub fn update(&mut self, msg: Message) -> Option<Message> {
         match msg {
             Message::InsertChar(c) => {
