@@ -15,9 +15,9 @@ mod view;
 mod parse;
 mod logging;
 mod themes;
-mod find;
 mod syntect_tui;
 mod notification;
+mod utilities;
 
 use logging::setup_logging;
 use tracing::info;

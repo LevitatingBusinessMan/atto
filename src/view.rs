@@ -6,8 +6,9 @@ use ratatui::{layout::{Alignment, Constraint, Direction, Layout, Rect}, style::{
 use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
 use tracing::debug;
 
-use crate::{model::{Model, UtilityWindow}, notification, parse::{parse_from, ParseCache}};
+use crate::{model::Model, notification, parse::{parse_from, ParseCache}, utilities::{self, confirm, Utility}};
 use crate::buffer::Buffer;
+use crate::utilities::UtilityWindow;
 
 /// files over this size might be handled differently (like not having a scrollbar)
 pub static LARGE_FILE_LIMIT: usize = 1_000_000;
@@ -119,8 +120,9 @@ impl View for Model {
         );
 
         match &self.utility {
-            Some(UtilityWindow::Help) => render_help(f, utility_area),
+            Some(UtilityWindow::Help(help)) => help.view(&self, f, utility_area),
             Some(UtilityWindow::Find(find)) => find.view(&self, f, utility_area),
+            Some(UtilityWindow::Confirm(confirm)) => confirm.view(&self, f, utility_area),
             None => {},
         }
 
@@ -158,36 +160,4 @@ fn highlight<'a>(buffer: &'a Buffer, height: usize, cache: Rc<RefCell<ParseCache
     let hl = Highlighter::new(theme);
     let syntax = buffer.syntax.as_ref().unwrap_or(syntax_set.find_syntax_plain_text());
     parse_from(buffer.top, lines, height, &mut cache.borrow_mut(), &hl, syntax, &syntax_set)
-}
-
-fn render_help(f: &mut Frame, area: Rect) {
-
-    f.render_widget(Clear, area);
-
-    f.render_widget(
-        Paragraph::new(
-r"Welcome to Atto!
-Here is a list of keybinds:
-C-c Copy
-C-x Cut
-C-v Paste
-C-a Select All
-A-a Start
-A-e End
-A-j Right
-A-i Up
-A-f Left
-A-n Down
-C-f Find
-C-e Command
-"
-)
-        .block(
-            Block::default()
-            .title("Help")
-            .borders(Borders::ALL)
-            .border_style(Style::new().blue())
-        )
-        .wrap(Wrap { trim: false })
-    , area);
 }

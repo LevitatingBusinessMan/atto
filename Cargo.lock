@@ -118,6 +118,7 @@ dependencies = [
  "crossterm",
  "custom_error",
  "dirs",
+ "indoc",
  "ratatui 0.29.0",
  "rstest",
  "syntect",

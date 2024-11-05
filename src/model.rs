@@ -2,10 +2,10 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
 
 use ratatui::{layout::Size, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
-use tracing::debug;
+use tracing::{debug, error};
 use tracing_subscriber::filter::combinator::Not;
 
-use crate::buffer::Buffer;
+use crate::{buffer::Buffer, utilities::{self, confirm, help, Utility, UtilityWindow}};
 use crate::parse::ParseCache;
 use crate::notification::Notification;
 
@@ -28,12 +28,6 @@ pub struct Model {
     pub theme: String,
     pub viewport: Size,
     pub notification: Option<Notification>,
-}
-
-/// The top right window
-pub enum UtilityWindow {
-    Help,
-    Find(crate::find::FindModel),
 }
 
 impl Model {
@@ -69,22 +63,6 @@ impl Model {
 
         debug!("{msg:?}");
 
-        match &mut self.utility {
-            Some(UtilityWindow::Find(find)) => {
-                match msg {
-                    Message::Escape | Message::Quit | Message::Find(_) => {},
-                    _ => {
-                        // this logic is off
-                        // the utility should not intercept (and remove) all
-                        // messages by default
-                        // it should intercept, and then return, remove or replace it
-                        return find.update(msg)
-                    }
-                }
-            },
-            _ => {}
-        }
-
         // remove notification if elapsed
         // (the handling of this makes it so that if the user does not somehow create a message)
         // the notification will hang around
@@ -94,22 +72,59 @@ impl Model {
             }
         }
 
+        let new_msg = match &mut self.utility {
+            Some(UtilityWindow::Find(find)) => find.update(msg),
+            Some(UtilityWindow::Help(help)) => help.update(msg),
+            Some(UtilityWindow::Confirm(confirm)) => confirm.update(msg),
+            None => Some(msg),
+        };
+
+        if new_msg.is_none() {
+            return None
+        }
+
+        let msg = new_msg.unwrap();
+
         match msg {
             Message::NextBuffer => self.selected = (self.selected + 1) % self.buffers.len(),
             Message::PreviousBuffer => self.selected = (self.selected + self.buffers.len() - 1) % self.buffers.len(),
-            Message::Quit => self.running = false,
+            Message::QuitNoSave => self.running = false,
+            Message::SaveQuit => {
+                let _msg = self.save();
+                self.running = false;
+            },
+            Message::Quit => {
+                match self.current_buffer().dirty() {
+                    Ok(true) => {
+                        self.utility = Some(UtilityWindow::Confirm(
+                            utilities::confirm::ConfirmModel::new(
+                                String::from("There are unsaved changes. Do you want to save?"),
+                                vec![
+                                    ('y', Message::SaveQuit),
+                                    ('n', Message::QuitNoSave),
+                                ]
+                        )));
+                    },
+                    Ok(false) => self.running = false,
+                    Err(err) => {
+                        error!("{err:?}");
+                        self.running = false;
+                    },
+                }
+            },
             Message::ScrollDown => {
                 if (self.current_buffer().content.lines().count() - self.viewport.height as usize) > self.current_buffer_mut().top {
                  self.current_buffer_mut().top += 1;
                 }
             },
             Message::ScrollUp => self.current_buffer_mut().top = self.current_buffer_mut().top.checked_sub(1).unwrap_or_default(),
-            Message::OpenHelp => self.utility = Some(UtilityWindow::Help),
-            Message::OpenFind => self.utility = Some(UtilityWindow::Find(crate::find::FindModel::new())),
-            Message::Escape => {
-                if self.utility.is_some() {
-                    self.utility = None;
-                }
+            Message::OpenHelp => self.utility = Some(UtilityWindow::Help(utilities::help::HelpModel())),
+            Message::OpenFind => self.utility = Some(UtilityWindow::Find(utilities::find::FindModel::new())),
+            Message::Escape => return Some(Message::CloseUtility),
+            Message::CloseUtility => self.utility = None,
+            Message::CloseUtilityAnd(msg) => {
+                self.utility = None;
+                return Some(*msg);
             },
             Message::InsertChar(chr) => {
                 self.current_buffer_mut().insert(chr);
@@ -169,20 +184,7 @@ impl Model {
                 self.current_buffer_mut().find(query);
                 self.may_scroll = true;
             },
-            Message::Save => {
-                if let Err(e) =  self.current_buffer_mut().save() {
-                    tracing::error!("{:?}", e);
-                    return Some(Message::Notification(
-                        format!("Error writing file: {e:?}"),
-                        Style::new().bg(Color::Green).fg(Color::Black)
-                    ));
-                } else {
-                    return Some(Message::Notification(
-                        String::from("SAVED"),
-                        Style::new().bg(Color::Green).fg(Color::Black)
-                    ));
-                }
-            },
+            Message::Save => return self.save(),
             Message::Resize(x, y) => {
                 self.viewport = (x,y).into();
             },
@@ -204,6 +206,14 @@ warning: unused variable: `width`
     = note: `#[warn(unused_variables)]` on by default"),
                     Style::new().bg(Color::Red)
                 ));
+                self.utility = Some(UtilityWindow::Confirm(
+                    utilities::confirm::ConfirmModel::new(
+                        String::from("There are unsaved changes. Do you want to save?"),
+                        vec![
+                            ('y', Message::Save),
+                            ('n', Message::CloseUtility),
+                        ]
+                )));
             },
         }        
         None
@@ -220,12 +230,28 @@ warning: unused variable: `width`
     pub fn theme(&self) -> &Theme {
         return &self.theme_set.themes[&self.theme]
     }
+
+    fn save(&mut self) -> Option<Message> {
+        if let Err(e) =  self.current_buffer_mut().save() {
+            tracing::error!("{:?}", e);
+            return Some(Message::Notification(
+                format!("Error writing file: {e:?}"),
+                Style::new().bg(Color::Green).fg(Color::Black)
+            ));
+        } else {
+            return Some(Message::Notification(
+                String::from("SAVED"),
+                Style::new().bg(Color::Green).fg(Color::Black)
+            ));
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Message {
     NextBuffer,
     PreviousBuffer,
+    /// Attempt to quit (but may be stopped)
     Quit,
     ScrollDown,
     ScrollUp,
@@ -252,4 +278,11 @@ pub enum Message {
     MouseLeft(u16, u16),
     Notification(String, Style),
     DeveloperKey,
+    CloseUtility,
+    /// Closes hte utility and produces a new message (used by cnonfirm)
+    CloseUtilityAnd(Box<Message>),
+    /// Save then quit
+    SaveQuit,
+    /// Quit immediately
+    QuitNoSave,
 }
