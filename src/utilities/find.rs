@@ -1,4 +1,4 @@
-use ratatui::{layout::{Constraint, Layout, Rect}, style::{Modifier, Style, Stylize}, text::{Line, Span}, widgets::{Block, Clear, Padding, Paragraph, Wrap}, Frame};
+use ratatui::{layout::{Constraint, Layout, Rect}, style::{Modifier, Style, Stylize}, text::{Line, Span}, widgets::{Clear, Paragraph, Wrap}, Frame};
 
 use crate::{model::{Message, Model}, utilities};
 

@@ -2,11 +2,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use color_eyre::owo_colors::OwoColorize;
-use ratatui::{layout::{Alignment, Constraint, Direction, Layout, Rect}, style::{Style, Stylize}, text::{Line, Text}, widgets::{Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarState, Wrap}, Frame};
+use ratatui::{layout::{Alignment, Constraint, Direction, Layout}, style::{Style, Stylize}, text::{Line, Text}, widgets::{Clear, Paragraph, Scrollbar, ScrollbarState}, Frame};
 use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
-use tracing::debug;
 
-use crate::{model::Model, notification, parse::{parse_from, ParseCache}, utilities::{self, confirm, Utility}};
+use crate::{model::Model, parse::{parse_from, ParseCache}, utilities::{Utility}};
 use crate::buffer::Buffer;
 use crate::utilities::UtilityWindow;
 

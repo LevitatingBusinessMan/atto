@@ -1,5 +1,4 @@
 use ratatui::widgets::{Clear, Paragraph};
-use tracing::{debug, error};
 
 use crate::model::Message;
 use indoc::indoc;

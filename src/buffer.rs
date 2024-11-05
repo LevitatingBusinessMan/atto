@@ -1,6 +1,6 @@
 use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::parse::*;
 

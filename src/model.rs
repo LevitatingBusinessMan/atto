@@ -1,11 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use ratatui::{layout::Size, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error};
-use tracing_subscriber::filter::combinator::Not;
 
-use crate::{buffer::Buffer, utilities::{self, confirm, help, Utility, UtilityWindow}};
+use crate::{buffer::Buffer, utilities::{self, Utility, UtilityWindow}};
 use crate::parse::ParseCache;
 use crate::notification::Notification;
 
