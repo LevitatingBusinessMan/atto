@@ -121,6 +121,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::PageDown => Some(Message::PageDown),
                 KeyCode::Backspace => Some(Message::Backspace),
                 KeyCode::Delete => Some(Message::Delete),
+                KeyCode::F(12) => Some(Message::DeveloperKey),
                 _ => None
             }
         }

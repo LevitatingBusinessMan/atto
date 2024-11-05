@@ -4,6 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 use color_eyre::owo_colors::OwoColorize;
 use ratatui::{layout::{Alignment, Constraint, Direction, Layout, Rect}, style::{Style, Stylize}, text::{Line, Text}, widgets::{Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarState, Wrap}, Frame};
 use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
+use tracing::debug;
 
 use crate::{model::{Model, UtilityWindow}, notification, parse::{parse_from, ParseCache}};
 use crate::buffer::Buffer;
@@ -127,7 +128,7 @@ impl View for Model {
         if let Some(notification) = &self.notification {
             let buffer = buffer_and_scrollbar[0];
             let wrapped_content = textwrap::fill(&notification.content, buffer.width as usize);
-            let height = wrapped_content.lines().count().div_ceil(buffer.height as usize);
+            let height = wrapped_content.lines().count();
             let mut area = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(0), Constraint::Length(height as u16)])
@@ -141,6 +142,8 @@ impl View for Model {
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Min(0), Constraint::Length(width as u16)])
                     .split(area)[1];
+            } else {
+                f.render_widget(Clear, area);
             }
             let widget = Text::raw(wrapped_content)
                 .style(notification.style)

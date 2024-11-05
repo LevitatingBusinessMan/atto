@@ -192,6 +192,19 @@ impl Model {
             Message::Notification(content, style) => {
                 self.notification = Some(Notification::new(content, style));
             },
+            Message::DeveloperKey => {
+                self.notification =  Some(Notification::new(
+                    format!("\
+warning: unused variable: `width`
+   --> src/view.rs:139:21
+    |
+139 |                 let width = wrapped_content.lines();
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_width`
+    |
+    = note: `#[warn(unused_variables)]` on by default"),
+                    Style::new().bg(Color::Red)
+                ));
+            },
         }        
         None
     }
@@ -238,4 +251,5 @@ pub enum Message {
     Resize(u16, u16),
     MouseLeft(u16, u16),
     Notification(String, Style),
+    DeveloperKey,
 }
