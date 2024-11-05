@@ -122,6 +122,7 @@ impl View for Model {
             Some(UtilityWindow::Help(help)) => help.view(&self, f, utility_area),
             Some(UtilityWindow::Find(find)) => find.view(&self, f, utility_area),
             Some(UtilityWindow::Confirm(confirm)) => confirm.view(&self, f, utility_area),
+            Some(UtilityWindow::Developer(developer)) => developer.view(&self, f, utility_area),
             None => {},
         }
 

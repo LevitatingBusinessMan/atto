@@ -4,7 +4,7 @@ use ratatui::{layout::Size, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error};
 
-use crate::{buffer::Buffer, utilities::{self, Utility, UtilityWindow}};
+use crate::{buffer::Buffer, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
 use crate::parse::ParseCache;
 use crate::notification::Notification;
 
@@ -75,6 +75,7 @@ impl Model {
             Some(UtilityWindow::Find(find)) => find.update(msg),
             Some(UtilityWindow::Help(help)) => help.update(msg),
             Some(UtilityWindow::Confirm(confirm)) => confirm.update(msg),
+            Some(UtilityWindow::Developer(developer)) => developer.update(msg),
             None => Some(msg),
         };
 
@@ -194,25 +195,7 @@ impl Model {
                 self.notification = Some(Notification::new(content, style));
             },
             Message::DeveloperKey => {
-                self.notification =  Some(Notification::new(
-                    format!("\
-warning: unused variable: `width`
-   --> src/view.rs:139:21
-    |
-139 |                 let width = wrapped_content.lines();
-    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_width`
-    |
-    = note: `#[warn(unused_variables)]` on by default"),
-                    Style::new().bg(Color::Red)
-                ));
-                self.utility = Some(UtilityWindow::Confirm(
-                    utilities::confirm::ConfirmModel::new(
-                        String::from("There are unsaved changes. Do you want to save?"),
-                        vec![
-                            ('y', Message::Save),
-                            ('n', Message::CloseUtility),
-                        ]
-                )));
+                self.utility = Some(UtilityWindow::Developer(DeveloperModel()));
             },
         }        
         None

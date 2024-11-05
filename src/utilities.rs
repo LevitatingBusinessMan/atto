@@ -1,6 +1,7 @@
 pub mod help;
 pub mod find;
 pub mod confirm;
+pub mod developer;
 
 use ratatui::{layout::Rect, style::{Style, Stylize}, widgets::{Block, Borders, Padding}, Frame};
 
@@ -32,4 +33,5 @@ pub enum UtilityWindow {
     Help(help::HelpModel),
     Find(find::FindModel),
     Confirm(confirm::ConfirmModel),
+    Developer(developer::DeveloperModel),
 }
