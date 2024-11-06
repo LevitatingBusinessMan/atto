@@ -4,6 +4,8 @@ use ratatui::{layout::Rect, style::{Color, Style}, widgets::{Clear, Paragraph}, 
 use tracing::{debug, error};
 
 use crate::model::{Message, Model};
+
+#[derive(Debug)]
 pub struct ShellModel {
     pub entry: String,
 }
@@ -12,6 +14,7 @@ impl ShellModel {
     pub fn new() -> Self {
         Self { entry: String::new() }
     }
+    #[tracing::instrument(skip_all, level="debug", fields(cmd=self.entry))]
     fn exec(&mut self) -> Message {
         let mut shell: Command;
         let cmd = if cfg!(target_os = "windows") {
@@ -28,6 +31,7 @@ impl ShellModel {
 
         match res {
             Ok(output) => {
+                debug!("Exited with status {:?}", output.status.code());
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 Message::Notification(
