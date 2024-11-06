@@ -2,7 +2,7 @@ use std::time;
 
 use anyhow::Ok;
 use crossterm::event::{self, KeyCode, KeyModifiers, MouseButton};
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::model::{Model, Message};
 
@@ -33,9 +33,8 @@ pub fn handle_event(_m: &Model, state: &mut EventState) -> anyhow::Result<Option
     }
 }
 
+#[tracing::instrument(level="trace", skip(state))]
 fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
-
-    debug!("{key:?}");
 
     // Space as a modifier key
     if key.code == KeyCode::Char(' ') {

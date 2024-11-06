@@ -14,6 +14,7 @@ impl ShellModel {
     pub fn new() -> Self {
         Self { entry: String::new() }
     }
+
     #[tracing::instrument(skip_all, level="debug", fields(cmd=self.entry))]
     fn exec(&mut self) -> Message {
         let mut shell: Command;

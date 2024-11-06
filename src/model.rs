@@ -58,10 +58,8 @@ impl Model {
         }
     }
 
+    #[tracing::instrument(skip(self), level="debug")]
     pub fn update(&mut self, msg: Message) -> Option<Message> {
-
-        debug!("{msg:?}");
-
         // remove notification if elapsed
         // (the handling of this makes it so that if the user does not somehow create a message)
         // the notification will hang around
