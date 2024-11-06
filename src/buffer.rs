@@ -1,6 +1,6 @@
 use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::parse::*;
 
@@ -296,6 +296,12 @@ impl Buffer {
             },
             None => Ok(self.content.is_empty()),
         }
+    }
+
+    pub fn paste(&mut self, content: &str) {
+        self.prefered_col = None;
+        self.content.insert_str(self.position, content);
+        self.position += content.len();
     }
 
 }

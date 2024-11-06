@@ -101,6 +101,7 @@ mod tui {
             | KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
             | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
         ))?;
+        stdout().queue(EnableBracketedPaste)?;
         let terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
         Ok(terminal)
     }
@@ -109,6 +110,7 @@ mod tui {
         stdout().execute(PopKeyboardEnhancementFlags)?;
         stdout().execute(DisableMouseCapture)?;
         stdout().execute(LeaveAlternateScreen)?;
+        stdout().queue(DisableBracketedPaste)?;
         disable_raw_mode()?;
         Ok(())
     }

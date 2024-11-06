@@ -2,6 +2,7 @@ pub mod help;
 pub mod find;
 pub mod confirm;
 pub mod developer;
+pub mod shell;
 
 use ratatui::{layout::Rect, style::{Style, Stylize}, widgets::{Block, Borders, Padding}, Frame};
 
@@ -24,7 +25,7 @@ pub fn default_block<'a>(name: &'a str) -> Block<'a> {
     Block::default()
     .title(name)
     .borders(Borders::ALL)
-    .padding(Padding::uniform(1))
+    //.padding(Padding::uniform(1))
     .border_style(Style::new().blue())
 }
 
@@ -34,4 +35,5 @@ pub enum UtilityWindow {
     Find(find::FindModel),
     Confirm(confirm::ConfirmModel),
     Developer(developer::DeveloperModel),
+    Shell(shell::ShellModel),
 }

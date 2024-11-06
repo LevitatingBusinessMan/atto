@@ -76,6 +76,7 @@ impl Model {
             Some(UtilityWindow::Help(help)) => help.update(msg),
             Some(UtilityWindow::Confirm(confirm)) => confirm.update(msg),
             Some(UtilityWindow::Developer(developer)) => developer.update(msg),
+            Some(UtilityWindow::Shell(shell)) => shell.update(msg),
             None => Some(msg),
         };
 
@@ -197,7 +198,9 @@ impl Model {
             Message::DeveloperKey => {
                 self.utility = Some(UtilityWindow::Developer(DeveloperModel()));
             },
-        }        
+            Message::Paste(paste) => self.current_buffer_mut().paste(&paste),
+            Message::OpenShell => self.utility = Some(utilities::UtilityWindow::Shell(utilities::shell::ShellModel::new())),
+        }
         None
     }
 
@@ -267,4 +270,6 @@ pub enum Message {
     SaveQuit,
     /// Quit immediately
     QuitNoSave,
+    Paste(String),
+    OpenShell,
 }

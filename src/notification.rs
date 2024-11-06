@@ -15,7 +15,8 @@ impl Notification {
     #[inline]
     fn timeout_fn(content_length: usize) -> Duration {
         // add 10ms per character
-        Duration::from_millis(Self::TIMEOUT_BASE.as_millis() as u64 + content_length as u64 * 10)
+        //Duration::from_millis(Self::TIMEOUT_BASE.as_millis() as u64 + content_length as u64 * 10)
+        Self::TIMEOUT_BASE
     }
 
     pub fn new(content: String, style: Style) -> Self {

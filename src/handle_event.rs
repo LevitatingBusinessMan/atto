@@ -25,6 +25,7 @@ pub fn handle_event(_m: &Model, state: &mut EventState) -> anyhow::Result<Option
             event::Event::Key(key) =>  Ok(handle_key(key, state)),
             event::Event::Mouse(mouse) => Ok(handle_mouse(mouse)),
             event::Event::Resize(x, y) => Ok(Some(Message::Resize(x, y))),
+            event::Event::Paste(paste) => Ok(Some(Message::Paste(paste))),
             _ => Ok(None),
         }
     } else {
@@ -106,6 +107,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Char('s') => Some(Message::Save),
                 KeyCode::Char('g') => Some(Message::OpenHelp),
                 KeyCode::Char('f') => Some(Message::OpenFind),
+                KeyCode::Char('b') => Some(Message::OpenShell),
                 _ => None,
             }
         } else {
