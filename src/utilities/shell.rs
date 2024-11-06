@@ -1,9 +1,10 @@
 use std::{env, process::{self, Command, Stdio}};
 
+use crossterm::{event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags}, terminal::{disable_raw_mode, enable_raw_mode}};
 use ratatui::{layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, widgets::{Clear, Paragraph}, Frame};
 use tracing::{debug, error};
 
-use crate::model::{Message, Model};
+use crate::{logging::LoggableError, model::{Message, Model}};
 
 use super::default_view;
 
@@ -17,7 +18,7 @@ impl ShellModel {
         Self { entry: String::new() }
     }
 
-    #[tracing::instrument(skip_all, level="debug", fields(cmd=self.entry))]
+    #[tracing::instrument(skip_all, level="info", fields(cmd=self.entry))]
     fn exec(&mut self) -> Message {
         let mut shell: Command;
         let cmd = if cfg!(target_os = "windows") {
@@ -28,8 +29,8 @@ impl ShellModel {
             shell.arg("-c")
         };
 
-        let res = cmd.arg(&self.entry).stdin(Stdio::inherit()).output();
-
+       let res = cmd.arg(&self.entry).stdin(Stdio::null()).output();
+    
         self.entry.clear();
 
         match res {

@@ -86,11 +86,11 @@ fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer>> {
     ))).collect()
 }
 mod tui {
-    use std::{io::stdout, panic};
+    use std::{io::{self, stdout}, panic};
     use crossterm::{terminal::*, event::*, ExecutableCommand, QueueableCommand};
     use ratatui::{Terminal, backend::{CrosstermBackend, Backend}};
 
-    pub fn init() -> anyhow::Result<Terminal<impl Backend>> {
+    pub fn init() -> io::Result<Terminal<impl Backend>> {
         stdout().execute(EnterAlternateScreen)?;
         enable_raw_mode()?;
         stdout().queue(EnableMouseCapture)?;
@@ -102,11 +102,10 @@ mod tui {
             | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
         ))?;
         stdout().queue(EnableBracketedPaste)?;
-        let terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
-        Ok(terminal)
+        Ok(Terminal::new(CrosstermBackend::new(stdout()))?)
     }
 
-    pub fn restore() -> anyhow::Result<()> {
+    pub fn restore() -> io::Result<()> {
         stdout().execute(PopKeyboardEnhancementFlags)?;
         stdout().execute(DisableMouseCapture)?;
         stdout().execute(LeaveAlternateScreen)?;
