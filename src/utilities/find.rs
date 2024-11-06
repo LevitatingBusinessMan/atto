@@ -14,7 +14,7 @@ impl FindModel {
 
 impl utilities::Utility for FindModel {
     fn view(&self, m: &Model, f: &mut Frame, area: Rect) {
-        // it might need the main model to render
+       // it might need the main model to render
        // to get the list of occurences from
        // the active buffer
 

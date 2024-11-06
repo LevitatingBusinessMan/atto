@@ -88,10 +88,6 @@ impl Model {
             Message::NextBuffer => self.selected = (self.selected + 1) % self.buffers.len(),
             Message::PreviousBuffer => self.selected = (self.selected + self.buffers.len() - 1) % self.buffers.len(),
             Message::QuitNoSave => self.running = false,
-            Message::SaveQuit => {
-                let _msg = self.save();
-                self.running = false;
-            },
             Message::Quit => {
                 match self.current_buffer().dirty() {
                     Ok(true) => {
@@ -99,7 +95,7 @@ impl Model {
                             utilities::confirm::ConfirmModel::new(
                                 String::from("There are unsaved changes. Do you want to save?"),
                                 vec![
-                                    ('y', Message::SaveQuit),
+                                    ('y', Message::Double(Box::new(Message::Save), Box::new(Message::Quit))),
                                     ('n', Message::QuitNoSave),
                                 ]
                         )));
@@ -121,10 +117,6 @@ impl Model {
             Message::OpenFind => self.utility = Some(UtilityWindow::Find(utilities::find::FindModel::new())),
             Message::Escape => return Some(Message::CloseUtility),
             Message::CloseUtility => self.utility = None,
-            Message::CloseUtilityAnd(msg) => {
-                self.utility = None;
-                return Some(*msg);
-            },
             Message::InsertChar(chr) => {
                 self.current_buffer_mut().insert(chr);
                 self.may_scroll = true;
@@ -198,6 +190,10 @@ impl Model {
             },
             Message::Paste(paste) => self.current_buffer_mut().paste(&paste),
             Message::OpenShell => self.utility = Some(utilities::UtilityWindow::Shell(utilities::shell::ShellModel::new())),
+            Message::Double(first, second) => {
+                self.update(*first);
+                return Some(*second);
+            }
         }
         None
     }
@@ -262,12 +258,10 @@ pub enum Message {
     Notification(String, Style),
     DeveloperKey,
     CloseUtility,
-    /// Closes hte utility and produces a new message (used by cnonfirm)
-    CloseUtilityAnd(Box<Message>),
-    /// Save then quit
-    SaveQuit,
     /// Quit immediately
     QuitNoSave,
     Paste(String),
     OpenShell,
+    /// Two messages
+    Double(Box<Message>, Box<Message>),
 }

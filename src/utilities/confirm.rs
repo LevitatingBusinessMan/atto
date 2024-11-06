@@ -20,7 +20,7 @@ impl super::Utility for ConfirmModel {
             Message::InsertChar(c) => {
                 for (choice, action) in self.choices.iter() {
                     if *choice == c {
-                        return Some(Message::CloseUtilityAnd(Box::new(action.clone())));
+                        return Some(Message::Double(Box::new(Message::CloseUtility), Box::new(action.clone())));
                     }
                 }
                 return None
