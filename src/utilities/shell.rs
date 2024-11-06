@@ -1,9 +1,11 @@
 use std::{env, process::{self, Command, Stdio}};
 
-use ratatui::{layout::Rect, style::{Color, Style}, widgets::{Clear, Paragraph}, Frame};
+use ratatui::{layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, widgets::{Clear, Paragraph}, Frame};
 use tracing::{debug, error};
 
 use crate::model::{Message, Model};
+
+use super::default_view;
 
 #[derive(Debug)]
 pub struct ShellModel {
@@ -64,8 +66,6 @@ impl super::Utility for ShellModel {
     }
 
     fn view(&self, m: &Model, f: &mut Frame, area: Rect) {
-        f.render_widget(Clear, area);
-        let block = super::default_block("Shell");
-        f.render_widget(Paragraph::new(self.entry.clone()).block(block), area);
+        super::default_view("Shell", &self.entry, f, area);
     }
 }

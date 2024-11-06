@@ -29,6 +29,21 @@ pub fn default_block<'a>(name: &'a str) -> Block<'a> {
     .border_style(Style::new().blue())
 }
 
+pub fn default_view(title: &str, content: &str, f: &mut Frame, area: Rect) {
+    use ratatui::layout::{Layout, Constraint, Direction};
+    use ratatui::widgets::{Clear, Paragraph};
+    let block = default_block(title);
+    let widget_content = textwrap::fill(content, block.inner(area).width as usize);
+    let height = widget_content.lines().count();
+    let bordersandpadding = area.height - block.inner(area).height;
+    let area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(height as u16 + bordersandpadding), Constraint::Min(0)])
+        .split(area)[0];
+    f.render_widget(Clear, area);
+    f.render_widget(Paragraph::new(widget_content).block(block), area);
+}
+
 /// The top right window
 pub enum UtilityWindow {
     Help(help::HelpModel),

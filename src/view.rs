@@ -103,12 +103,12 @@ impl View for Model {
                 Line::styled(
                     std::format!(
                         " {:<} {:>width$} ",
-                        "Welcome to Atto! Ctrl-g for help",
+                        "Welcome to Atto! Ctrl-h for help",
                         std::format!("[{}]", self.buffers.iter().map(
                             |b| b.name.clone() +
                             (if b.dirty().unwrap_or_else(|e| {tracing::error!("{:?}", e); true}) { "+" } else { "" })
                         ).collect::<Vec<String>>().join("|")),
-                        width = main[1].width as usize - "Welcome to Atto! Ctrl-g for help".len() - 3
+                        width = main[1].width as usize - "Welcome to Atto! Ctrl-h for help".len() - 3
                     ),
                     Style::default()
                     .black()

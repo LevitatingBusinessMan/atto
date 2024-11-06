@@ -30,12 +30,8 @@ impl super::Utility for ConfirmModel {
     }
     
     fn view(&self, m: &crate::model::Model, f: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
-        f.render_widget(Clear, area);
-        let block = super::default_block("Confirm");
-        let width = block.inner(area).width as usize;
         let choicesstring= self.choices.iter().map(|(c, _a)| c.to_string()).collect::<Vec<_>>().join("/");
-        f.render_widget(Paragraph::new(textwrap::fill(&mut format!(indoc! {"
-        {}: {}
-        "}, self.msg, choicesstring), width)).block(block), area);
+        let content =  format!("{}: {}", self.msg, choicesstring);
+        super::default_view("Confirm", &content, f, area);
     }
 }

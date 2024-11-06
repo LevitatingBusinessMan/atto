@@ -29,12 +29,8 @@ impl super::Utility for DeveloperModel {
         }
     }
     fn view(&self, m: &crate::model::Model, f: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
-        f.render_widget(Clear, area);
-        f.render_widget(
-        Paragraph::new(indoc! {"
+        super::default_view("brrrrr", indoc! {"
         * n - create an error notification
-        "})
-        .block(super::default_block("brrrrr"))
-        .wrap(Wrap { trim: false }), area);
+        "}, f, area);
     }
 }
