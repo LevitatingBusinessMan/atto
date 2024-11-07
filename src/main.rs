@@ -20,7 +20,7 @@ mod syntect_tui;
 mod notification;
 mod utilities;
 
-use logging::setup_logging;
+use logging::{setup_logging, LogError};
 use tracing::info;
 use view::View;
 use model::Model;
@@ -56,13 +56,13 @@ fn main() -> anyhow::Result<()> {
     let buffers = match args.files {
         Some(files) => read_files(files),
         None => io::Result::Ok(vec![Buffer::empty()]),
-    }?;
+    }.log()?;
 
     let mut terminal = tui::init()?;
 
     tui::install_panic_hook();
 
-    let theme_set = themes::theme_set()?;
+    let theme_set = themes::theme_set().log()?;
     let mut model = Model::new(buffers, theme_set, terminal.size().unwrap());
 
     let mut event_state = handle_event::EventState::default();

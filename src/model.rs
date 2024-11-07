@@ -4,7 +4,7 @@ use ratatui::{layout::Size, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error};
 
-use crate::{buffer::{self, Buffer}, logging::LoggableError, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
+use crate::{buffer::{self, Buffer}, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
 use crate::parse::ParseCache;
 use crate::notification::Notification;
 
