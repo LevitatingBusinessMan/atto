@@ -4,7 +4,7 @@ use ratatui::{layout::Size, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error};
 
-use crate::{buffer::Buffer, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
+use crate::{buffer::{self, Buffer}, logging::LoggableError, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
 use crate::parse::ParseCache;
 use crate::notification::Notification;
 
@@ -95,8 +95,8 @@ impl Model {
                             utilities::confirm::ConfirmModel::new(
                                 String::from("There are unsaved changes. Do you want to save?"),
                                 vec![
-                                    ('y', Message::Double(Box::new(Message::Save), Box::new(Message::Quit))),
-                                    ('n', Message::QuitNoSave),
+                                    ('y', Some(Message::Double(Box::new(Message::Save), Box::new(Message::Quit)))),
+                                    ('n', Some(Message::QuitNoSave)),
                                 ]
                         )));
                     },
@@ -175,7 +175,34 @@ impl Model {
                 self.current_buffer_mut().find(query);
                 self.may_scroll = true;
             },
-            Message::Save => return self.save(),
+            Message::Save => {
+                if let Err(e) =  self.current_buffer_mut().save() {
+                    tracing::warn!("{:?}", e);
+                    return Some(Message::Notification(
+                        format!("Error writing file: {e}"),
+                        Style::new().bg(Color::Red).fg(Color::White)
+                    ));
+                } else {
+                    return Some(Message::Notification(
+                        String::from("SAVED"),
+                        Style::new().bg(Color::Green).fg(Color::Black)
+                    ));
+                }
+            },
+            Message::SaveAsRoot => {
+                if let Err(e) = self.current_buffer_mut().save_as_root() {
+                    tracing::error!("Error saving as root: {e:?}");
+                    return Some(Message::Notification(
+                        format!("Error saving as root: {e}"),
+                        Style::new().bg(Color::Red).fg(Color::White)
+                    ));
+                } else {
+                    return Some(Message::Notification(
+                        String::from("SAVED AS ROOT"),
+                        Style::new().bg(Color::Yellow).fg(Color::Black)
+                    ));
+                }
+            },
             Message::Resize(x, y) => {
                 self.viewport = (x,y).into();
             },
@@ -193,7 +220,17 @@ impl Model {
             Message::Double(first, second) => {
                 self.update(*first);
                 return Some(*second);
-            }
+            },
+            Message::SaveAsRootConfirmation => {
+                self.utility = Some(UtilityWindow::Confirm(
+                    utilities::confirm::ConfirmModel::new(
+                        format!("Do you want to save this file using {}?", buffer::PRIVESC_CMD),
+                        vec![
+                            ('y', Some(Message::SaveAsRoot)),
+                            ('n', None)
+                        ]
+                )));
+            },
         }
         None
     }
@@ -208,21 +245,6 @@ impl Model {
 
     pub fn theme(&self) -> &Theme {
         return &self.theme_set.themes[&self.theme]
-    }
-
-    fn save(&mut self) -> Option<Message> {
-        if let Err(e) =  self.current_buffer_mut().save() {
-            tracing::error!("{:?}", e);
-            return Some(Message::Notification(
-                format!("Error writing file: {e:?}"),
-                Style::new().bg(Color::Green).fg(Color::Black)
-            ));
-        } else {
-            return Some(Message::Notification(
-                String::from("SAVED"),
-                Style::new().bg(Color::Green).fg(Color::Black)
-            ));
-        }
     }
 }
 
@@ -264,4 +286,6 @@ pub enum Message {
     OpenShell,
     /// Two messages
     Double(Box<Message>, Box<Message>),
+    SaveAsRootConfirmation,
+    SaveAsRoot,
 }

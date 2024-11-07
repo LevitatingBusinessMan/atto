@@ -23,6 +23,7 @@ crossterm = "0.28"
 custom_error = "1.9.2"
 dirs = "5.0.1"
 indoc = "2.0.5"
+nix = "0.29.0"
 ratatui = "0.29"
 syntect = { version = "5.1", default-features = false }
 textwrap = "0.16.1"

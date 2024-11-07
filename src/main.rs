@@ -3,7 +3,8 @@
 #![feature(iter_advance_by)]
 #![feature(let_chains)]
 #![feature(panic_payload_as_str)]
-use std::{fs, io, path::PathBuf};
+#![feature(anonymous_pipe)]
+use std::{fs::{self, File}, io::{self, Error}, path::PathBuf};
 
 use clap::{Parser, crate_version};
 use anyhow;
@@ -79,12 +80,25 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn read_files(files: Vec<String>) -> io::Result<Vec<Buffer>> {
-    files.iter().map(|f| Ok(Buffer::new(
-            f.clone(),
-            fs::File::options().create(true).read(true).write(true).open(f)?
-    ))).collect()
+fn read_files(paths: Vec<String>) -> io::Result<Vec<Buffer>> {
+    let mut buffers: Vec<Buffer> = Vec::with_capacity(paths.len());
+    for path in paths.iter() {
+        let (file, readonly) = match fs::File::options().create(true).read(true).write(true).open(path) {
+            Ok(f) => (f, false),
+            Err(err) => match err.kind() {
+                io::ErrorKind::PermissionDenied => {
+                    tracing::debug!("Permission denied opening {path:?}, attempting to open readonly");
+                    (fs::File::options().read(true).open(path)?, true)
+                }
+                _ => return Err(err)
+            },
+        };
+
+        buffers.push(Buffer::new(path.clone(), file, readonly));
+    }
+    Ok(buffers)
 }
+
 mod tui {
     use std::{io::{self, stdout}, panic};
     use crossterm::{terminal::*, event::*, ExecutableCommand, QueueableCommand};

@@ -1,8 +1,10 @@
-use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, sync::{Arc, Mutex}, usize};
+use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, sync::{Arc, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{debug, info};
 
 use crate::parse::*;
+
+pub static PRIVESC_CMD: &'static str = "run0";
 
 #[derive(Clone, Debug)]
 pub struct Buffer {
@@ -10,7 +12,7 @@ pub struct Buffer {
     pub content: String,
     pub file: Option<Arc<Mutex<File>>>,
     pub position: usize,
-    pub read_only: bool,
+    pub readonly: bool,
     /// How far the buffer is scrolled
     pub top: usize,
     /// Which column the cursor wants to be in (that's vague I know)
@@ -22,7 +24,7 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn new(name: String, mut file: File) -> Self {
+    pub fn new(name: String, mut file: File, readonly: bool) -> Self {
         let mut content = String::new();
         file.read_to_string(&mut content).unwrap();
         return Self {
@@ -30,7 +32,7 @@ impl Buffer {
             content: content,
             file: Some(Arc::new(Mutex::new(file))),
             position: 0,
-            read_only: false,
+            readonly,
             top: 0,
             prefered_col: None,
             parse_cache: HashMap::new(),
@@ -45,7 +47,7 @@ impl Buffer {
             content: String::new(),
             file: None,
             position: 0,
-            read_only: false,
+            readonly: false,
             top: 0,
             prefered_col: None,
             parse_cache: HashMap::new(),
@@ -59,7 +61,7 @@ impl Buffer {
     }
 
     pub fn set_readonly(&mut self, ro: bool) {
-        self.read_only = ro;
+        self.readonly = ro;
     }
 
     /// Set the position into the buffer based on a location on the viewport
@@ -269,6 +271,9 @@ impl Buffer {
 
     /// save to disk
     pub fn save(&mut self) -> io::Result<()> {
+        if self.readonly {
+            return Err(io::Error::other("Set readonly"))
+        }
         if self.file.is_none() {
             let file = File::options().create(true).write(true).open(self.name.clone())?;
             self.file = Some(Arc::new(Mutex::new(file)));
@@ -278,11 +283,34 @@ impl Buffer {
         file.rewind()?;
         file.write_all(self.content.as_bytes())?;
         file.set_len(self.content.len() as u64)?;
-        file.flush()?;
 
         info!("Wrote {} bytes to {}", self.content.as_bytes().len(), self.name);
 
         Ok(())
+    }
+
+    #[tracing::instrument(skip(self), level="debug")]
+    pub fn save_as_root(&mut self) -> io::Result<()> {
+        let (reader, mut writer) = std::pipe::pipe()?;
+        let (mut stderr_reader, stderr_writer) = std::pipe::pipe()?;
+        let mut dd = process::Command::new(PRIVESC_CMD)
+            .args(vec!["dd", "bs=4k", &format!("of={}", self.name)])
+            .stdin(reader)
+            .stdout(Stdio::null())
+            .stderr(stderr_writer)
+            .spawn()?;
+        writer.write_all(self.content.as_bytes())?;
+        writer.flush()?;
+        nix::unistd::close(writer.into_raw_fd())?;
+        let status = dd.wait()?;
+        match status.success() {
+            true => Ok(()),
+            false => {
+                let mut stderr = String::new();
+                stderr_reader.read_to_string(&mut stderr)?;
+                Err(io::Error::other(stderr))
+            },
+        }
     }
 
     pub fn dirty(&self) -> io::Result<bool> {
