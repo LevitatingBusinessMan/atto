@@ -306,9 +306,9 @@ impl Buffer {
         match status.success() {
             true => Ok(()),
             false => {
-                let mut stderr = String::new();
-                stderr_reader.read_to_string(&mut stderr)?;
-                Err(io::Error::other(stderr))
+                let mut stderr = vec![];
+                stderr_reader.read_to_end(&mut stderr)?;
+                Err(io::Error::other(String::from_utf8_lossy(&stderr)))
             },
         }
     }
