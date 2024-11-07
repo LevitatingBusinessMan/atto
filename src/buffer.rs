@@ -292,12 +292,11 @@ impl Buffer {
     #[tracing::instrument(skip(self), level="debug")]
     pub fn save_as_root(&mut self) -> io::Result<()> {
         let (reader, mut writer) = std::pipe::pipe()?;
-        let (mut stderr_reader, stderr_writer) = std::pipe::pipe()?;
         let mut dd = process::Command::new(PRIVESC_CMD)
             .args(vec!["dd", "bs=4k", &format!("of={}", self.name)])
             .stdin(reader)
             .stdout(Stdio::null())
-            .stderr(stderr_writer)
+            .stderr(Stdio::piped())
             .spawn()?;
         writer.write_all(self.content.as_bytes())?;
         writer.flush()?;
@@ -306,9 +305,9 @@ impl Buffer {
         match status.success() {
             true => Ok(()),
             false => {
-                let mut stderr = vec![];
-                stderr_reader.read_to_end(&mut stderr)?;
-                Err(io::Error::other(String::from_utf8_lossy(&stderr)))
+                let mut stderr = String::new();
+                dd.stderr.unwrap().read_to_string(&mut stderr)?;
+                Err(io::Error::other(stderr))
             },
         }
     }
