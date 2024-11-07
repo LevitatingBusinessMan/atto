@@ -47,7 +47,7 @@ impl Buffer {
 
     pub fn empty() -> Self {
         return Self {
-            name: "Unknown".to_string(),
+            name: "".to_string(),
             content: String::new(),
             file: None,
             position: 0,
