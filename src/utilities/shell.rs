@@ -3,7 +3,7 @@ use std::{env, io::{self, stdout, BufRead, BufReader, Read, Stdout, Write}, os::
 use crossterm::{event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags}, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}, ExecutableCommand, QueueableCommand};
 use nix::{libc::POLLIN, poll::{poll, PollFd, PollFlags, PollTimeout}, sys::{select::FdSet, time::TimeVal}};
 use ratatui::{layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, widgets::{Clear, Paragraph}, Frame};
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 
 use crate::{logging::LogError, model::{Message, Model}, TERMINAL};
 
@@ -64,27 +64,49 @@ impl ShellModel {
         loop {
             match child.try_wait()? {
                 Some(status) => {
+                    terminal.clear()?;
                     crate::tui::setup()?;
-                    debug!("Exited with status {:?}, {}b stdout, {}b stderr", status.code(), stdout.len(), stderr.len());
+                    debug!("Exited with status {:?}", status.code());
                     stdout_pipe.read_to_end(&mut stdout)?;
                     stderr_pipe.read_to_end(&mut stderr)?;
-                    let stdout = String::from_utf8_lossy(&stdout);
-                    let stderr = String::from_utf8_lossy(&stderr);
+                    debug!("Total {}b stdout, {}b stderr", stdout.len(), stderr.len());
+                    
+                    let stdout = String::from_utf8(stdout);
+                    let stderr = String::from_utf8(stderr);
 
-                    let display = if stderr.is_empty() || stdout.is_empty() {
-                        format!("{}{}", stdout.trim(), stderr.trim()) }
-                    else {
-                        format!("{}\n{}", stdout.trim(), stderr.trim())
-                    };
-            
-                    let style = if status.success(){
-                        Style::new().bg(Color::White).fg(Color::Black)
+                    if stdout.is_err() || stderr.is_err() {
+                        warn!("Failed to utf8 parse command output");
+                        match status.success() {
+                            true => {
+                                return Ok(Message::Notification(
+                                    format!("Command executed succesfully, but output was not utf8"),
+                                    Style::new().bg(Color::Green).fg(Color::White)
+                                ));
+                            },
+                            false => {
+                                return Ok(Message::Notification(
+                                    format!("Command failed with code {:?}, output was not utf8", status.code()),
+                                    Style::new().bg(Color::Red).fg(Color::White)
+                                ));
+                            }
+                        }
+                    } else {
+                        let style = if status.success(){
+                            Style::new().bg(Color::White).fg(Color::Black)
+                        }
+                        else {
+                            Style::new().bg(Color::Red).fg(Color::White)
+                        };
+                        let stdout = stdout.unwrap();
+                        let stderr = stderr.unwrap();
+                        let display = if stderr.is_empty() || stdout.is_empty() {
+                            format!("{}{}", stdout.trim(), stderr.trim()) }
+                        else {
+                            format!("{}\n{}", stdout.trim(), stderr.trim())
+                        };
+                
+                        return Ok(Message::Notification(display, style))
                     }
-                    else {
-                        Style::new().bg(Color::Red)
-                    };
-            
-                    return Ok(Message::Notification(display, style))
                 },
                 None => {
                     pollfds[0].set_events(PollFlags::POLLIN);
@@ -94,13 +116,13 @@ impl ShellModel {
                             let n = stdout_pipe.read(&mut stdout_buf)?;
                             debug!("received {} bytes in stdout", n);
                             stdout.extend_from_slice(&stdout_buf[..n]);
-                            write!(io::stdout(), "{}", String::from_utf8_lossy(&stdout_buf[..n]))?;
+                            io::stdout().write_all(&stdout_buf[..n])?;
                         }
                         if pollfds[1].any().unwrap() {
                             let n = stderr_pipe.read(&mut stderr_buf)?;
                             debug!("received {} bytes in stderr", n);
                             stderr.extend_from_slice(&stderr_buf[..n]);
-                            write!(io::stderr(), "{}", String::from_utf8_lossy(&stderr_buf[..n]))?;
+                            io::stderr().write_all(&stderr_buf[..n])?;
                         }
                     }
                 },
