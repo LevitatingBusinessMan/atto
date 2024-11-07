@@ -6,6 +6,7 @@ pub struct Notification {
     pub timestamp: Instant,
     pub content: String,
     pub style: Style,
+    pub top: usize,
 }
 
 impl Notification {
@@ -21,7 +22,7 @@ impl Notification {
 
     pub fn new(content: String, style: Style) -> Self {
         tracing::debug!("Notification made with length {} and timeout {}ms", content.len(), Self::timeout_fn(content.len()).as_millis());
-        Notification { timestamp: Instant::now(), content, style }
+        Notification { timestamp: Instant::now(), content, style, top: 0 }
     }
 
     pub fn expired(&self) -> bool {
