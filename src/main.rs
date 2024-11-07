@@ -49,6 +49,8 @@ struct Args {
     debug: bool,
     #[arg(long, help="use an alternative logfile path")]
     logfile: Option<PathBuf>,
+    #[arg(long, help="do not alter the buffer")]
+    readonly: bool,
     files: Option<Vec<String>>
 }
 

@@ -12,6 +12,9 @@ pub struct Buffer {
     pub content: String,
     pub file: Option<Arc<Mutex<File>>>,
     pub position: usize,
+    /// the file was opened as readonly
+    pub opened_readonly: bool,
+    /// This buffer shall not be edited
     pub readonly: bool,
     /// How far the buffer is scrolled
     pub top: usize,
@@ -32,7 +35,8 @@ impl Buffer {
             content: content,
             file: Some(Arc::new(Mutex::new(file))),
             position: 0,
-            readonly,
+            readonly: false,
+            opened_readonly: readonly,
             top: 0,
             prefered_col: None,
             parse_cache: HashMap::new(),
@@ -48,6 +52,7 @@ impl Buffer {
             file: None,
             position: 0,
             readonly: false,
+            opened_readonly: false,
             top: 0,
             prefered_col: None,
             parse_cache: HashMap::new(),
@@ -231,11 +236,13 @@ impl Buffer {
     }
 
     pub fn insert(&mut self, chr: char) {
-        self.content.insert(self.position, chr);
-        self.move_right();
-        // invalidating from top is faster than figuring out the current line
-        // and you render from the top anyway
-        self.parse_cache.invalidate_from(self.top);
+        if !self.readonly {
+            self.content.insert(self.position, chr);
+            self.move_right();
+            // invalidating from top is faster than figuring out the current line
+            // and you render from the top anyway
+            self.parse_cache.invalidate_from(self.top);
+        }
     }
 
     pub fn find(&mut self, query: String) {
@@ -272,7 +279,10 @@ impl Buffer {
     /// save to disk
     pub fn save(&mut self) -> io::Result<()> {
         if self.readonly {
-            return Err(io::Error::other("Set readonly"))
+            return Err(io::Error::other("Buffer is readonly"))
+        }
+        if self.opened_readonly {
+            return Err(io::Error::other("No write permission to file"))
         }
         if self.file.is_none() {
             let file = File::options().create(true).write(true).open(self.name.clone())?;
@@ -326,9 +336,11 @@ impl Buffer {
     }
 
     pub fn paste(&mut self, content: &str) {
-        self.prefered_col = None;
-        self.content.insert_str(self.position, content);
-        self.position += content.len();
+        if !self.readonly {
+            self.prefered_col = None;
+            self.content.insert_str(self.position, content);
+            self.position += content.len();
+        }
     }
 
 }
