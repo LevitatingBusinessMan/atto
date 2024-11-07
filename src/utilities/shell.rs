@@ -74,6 +74,14 @@ impl ShellModel {
                     let stdout = String::from_utf8(stdout);
                     let stderr = String::from_utf8(stderr);
 
+                    /*
+                    I really need to fix the output formatting here.
+                    If the stdout and stderr are empty user should still get feedback.
+                    The utf8 should never be invalid. I feel like that would be worthy of an error.
+                    When there is both stdout and stderr they should've preferable been mixed
+                    beforehand.
+                     */
+
                     if stdout.is_err() || stderr.is_err() {
                         warn!("Failed to utf8 parse command output");
                         match status.success() {
