@@ -1,6 +1,6 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Mutex};
 
-use ratatui::{layout::Size, style::{Color, Style}};
+use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}, Terminal};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error};
 
@@ -85,6 +85,7 @@ impl Model {
         let msg = new_msg.unwrap();
 
         match msg {
+            Message::NoMessage => {},
             Message::NextBuffer => self.selected = (self.selected + 1) % self.buffers.len(),
             Message::PreviousBuffer => self.selected = (self.selected + self.buffers.len() - 1) % self.buffers.len(),
             Message::QuitNoSave => self.running = false,
@@ -95,8 +96,8 @@ impl Model {
                             utilities::confirm::ConfirmModel::new(
                                 String::from("There are unsaved changes. Do you want to save?"),
                                 vec![
-                                    ('y', Some(Message::Double(Box::new(Message::Save), Box::new(Message::Quit)))),
-                                    ('n', Some(Message::QuitNoSave)),
+                                    ('y', Message::Double(Box::new(Message::Save), Box::new(Message::Quit))),
+                                    ('n', Message::QuitNoSave),
                                 ]
                         )));
                     },
@@ -226,8 +227,8 @@ impl Model {
                     utilities::confirm::ConfirmModel::new(
                         format!("Do you want to save this file using {}?", buffer::PRIVESC_CMD),
                         vec![
-                            ('y', Some(Message::SaveAsRoot)),
-                            ('n', None)
+                            ('y', Message::SaveAsRoot),
+                            ('n', Message::NoMessage)
                         ]
                 )));
             },
@@ -288,4 +289,6 @@ pub enum Message {
     Double(Box<Message>, Box<Message>),
     SaveAsRootConfirmation,
     SaveAsRoot,
+    /// can be used just to force update() and view() to run
+    NoMessage,
 }

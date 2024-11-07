@@ -12,6 +12,7 @@ use crate::model::{Message, Model};
 pub trait Utility {
     /// Receive a message
     /// The utility may choose to discard, forward or replace it
+    /// (this can probably take a reference to the model if necessary)
     fn update(&mut self, msg: Message) -> Option<Message> {
         Some(msg)
     }

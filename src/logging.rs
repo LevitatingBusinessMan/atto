@@ -39,7 +39,6 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
 pub trait LogError {
     /// If this result is an error, log it as such
     fn log(self) -> Self;
-    fn warn(self) -> Self;
 }
 
 impl<T> LogError for io::Result<T> {
@@ -49,24 +48,12 @@ impl<T> LogError for io::Result<T> {
         }
         self
     }
-    fn warn(self) -> Self {
-        if let Err(err) = &self {
-            tracing::warn!("{err:?}");
-        }
-        self
-    }
 }
 
 impl<T> LogError for anyhow::Result<T> {
     fn log(self) -> Self {
         if let Err(err) = &self {
             tracing::error!("{err:?}");
-        }
-        self
-    }
-    fn warn(self) -> Self {
-        if let Err(err) = &self {
-            tracing::warn!("{err:?}");
         }
         self
     }

@@ -4,7 +4,8 @@
 #![feature(let_chains)]
 #![feature(panic_payload_as_str)]
 #![feature(anonymous_pipe)]
-use std::{fs::{self, File}, io::{self, Error}, path::PathBuf};
+#![feature(read_buf)]
+use std::{fs::{self, File}, io::{self, Error, Stdout}, path::PathBuf, rc::Rc, sync::{Mutex, OnceLock}};
 
 use clap::{Parser, crate_version};
 use anyhow;
@@ -21,6 +22,7 @@ mod notification;
 mod utilities;
 
 use logging::{setup_logging, LogError};
+use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};
 use tracing::info;
 use view::View;
 use model::Model;
@@ -29,6 +31,8 @@ use buffer::Buffer;
 
 #[cfg(all(feature = "onig", feature = "fancy_regex"))]
 compile_error!("feature \"onig\" and feature \"fancy_regex\" cannot be enabled at the same time");
+
+static TERMINAL: OnceLock<Mutex<Terminal<CrosstermBackend<Stdout>>>> = OnceLock::new();
 
 static HELP_TEMPLATE: &'static str = "\
 {usage-heading} {usage}
@@ -58,7 +62,7 @@ fn main() -> anyhow::Result<()> {
         None => io::Result::Ok(vec![Buffer::empty()]),
     }.log()?;
 
-    let mut terminal = tui::init()?;
+    let mut terminal = tui::init().log()?;
 
     tui::install_panic_hook();
 
@@ -68,11 +72,12 @@ fn main() -> anyhow::Result<()> {
     let mut event_state = handle_event::EventState::default();
 
     terminal.draw(|frame| model.view(frame))?;
+    TERMINAL.set(Mutex::new(terminal)).unwrap();
     while model.running {
         let mut msg = handle_event(&model, &mut event_state)?;
         while msg.is_some() {
             msg = model.update(msg.unwrap());
-            terminal.draw(|frame| model.view(frame))?;
+            TERMINAL.get().unwrap().lock().unwrap().draw(|frame| model.view(frame))?;
         }
     }
 
@@ -100,16 +105,16 @@ fn read_files(paths: Vec<String>) -> io::Result<Vec<Buffer>> {
 }
 
 mod tui {
-    use std::{io::{self, stdout}, panic};
+    use std::{io::{self, stdout, Stdout}, panic};
     use crossterm::{terminal::*, event::*, ExecutableCommand, QueueableCommand};
     use ratatui::{Terminal, backend::{CrosstermBackend, Backend}};
 
-    pub fn init() -> io::Result<Terminal<impl Backend>> {
+    pub fn init() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
         stdout().execute(EnterAlternateScreen)?;
         enable_raw_mode()?;
         stdout().queue(EnableMouseCapture)?;
         // https://docs.rs/crossterm/latest/crossterm/event/struct.KeyboardEnhancementFlags.html
-       stdout().queue(PushKeyboardEnhancementFlags(
+        stdout().queue(PushKeyboardEnhancementFlags(
             KeyboardEnhancementFlags::REPORT_EVENT_TYPES
             | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
             | KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES

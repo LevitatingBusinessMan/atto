@@ -5,11 +5,11 @@ use indoc::indoc;
 
 pub struct ConfirmModel {
     pub msg: String,
-    pub choices: Vec<(char, Option<Message>)>
+    pub choices: Vec<(char, Message)>
 }
 
 impl ConfirmModel {
-    pub fn new(msg: String, choices: Vec<(char, Option<Message>)>) -> Self {
+    pub fn new(msg: String, choices: Vec<(char, Message)>) -> Self {
         Self {msg, choices}
     }
 }
@@ -20,13 +20,10 @@ impl super::Utility for ConfirmModel {
             Message::InsertChar(c) => {
                 for (choice, action) in self.choices.iter() {
                     if *choice == c {
-                        return Some(match action {
-                            Some(action) => Message::Double(
-                                Box::new(Message::CloseUtility),
-                                Box::new(action.clone())
-                            ),
-                            None => Message::CloseUtility,
-                        });
+                        return Some(Message::Double(
+                            Box::new(Message::CloseUtility),
+                            Box::new(action.clone())
+                        ));
                     }
                 }
                 return None
