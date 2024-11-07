@@ -1,6 +1,7 @@
-use std::{env, io::{self, stdout, Read, Stdout, Write}, process::{self, Command, Stdio}};
+use std::{env, io::{self, stdout, BufRead, BufReader, Read, Stdout, Write}, os::fd::{AsRawFd, BorrowedFd}, process::{self, Command, Stdio}};
 
 use crossterm::{event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags}, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}, ExecutableCommand, QueueableCommand};
+use nix::{libc::POLLIN, poll::{poll, PollFd, PollFlags, PollTimeout}, sys::{select::FdSet, time::TimeVal}};
 use ratatui::{layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, widgets::{Clear, Paragraph}, Frame};
 use tracing::{debug, error};
 
@@ -33,8 +34,6 @@ impl ShellModel {
         };
 
         let mut terminal = crate::TERMINAL.get().unwrap().lock().unwrap();
-
-        tracing::warn!("Clearing terminal");
         terminal.clear()?;
         terminal.set_cursor_position((0,0))?;
         crate::tui::restore()?;
@@ -47,35 +46,25 @@ impl ShellModel {
 
         self.entry.clear();
 
+        // we could potentially improve performance by using a bufreader
         let mut stdout_pipe = child.stdout.take().unwrap();
         let mut stderr_pipe = child.stderr.take().unwrap();
 
         let mut stdout_buf = [0; 1024];
-        let mut stderr = Vec::with_capacity(256);
+        let mut stderr_buf = [0; 1024];
 
         let mut stdout = vec![];
+        let mut stderr = vec![];
 
-        let mut firstread = true;
+        let mut pollfds = vec![
+            PollFd::new(unsafe { BorrowedFd::borrow_raw(stdout_pipe.as_raw_fd()) }, PollFlags::POLLIN),
+            PollFd::new(unsafe { BorrowedFd::borrow_raw(stderr_pipe.as_raw_fd()) }, PollFlags::POLLIN),
+        ];
 
         loop {
-            let stdout_read = stdout_pipe.read(&mut stdout_buf)?;
-            let stderr_read = stderr_pipe.read(&mut stderr)?;
             match child.try_wait()? {
                 Some(status) => {
-                    {
-                        io::stdout().execute(EnterAlternateScreen);
-                        enable_raw_mode();
-                        io::stdout().queue(EnableMouseCapture);
-                        // https://docs.rs/crossterm/latest/crossterm/event/struct.KeyboardEnhancementFlags.html
-                        io::stdout().queue(PushKeyboardEnhancementFlags(
-                            KeyboardEnhancementFlags::REPORT_EVENT_TYPES
-                            | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
-                            | KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                            | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
-                        ));
-                        io::stdout().queue(EnableBracketedPaste);
-                    }
-
+                    crate::tui::setup()?;
                     debug!("Exited with status {:?}, {}b stdout, {}b stderr", status.code(), stdout.len(), stderr.len());
                     stdout_pipe.read_to_end(&mut stdout)?;
                     stderr_pipe.read_to_end(&mut stderr)?;
@@ -98,16 +87,21 @@ impl ShellModel {
                     return Ok(Message::Notification(display, style))
                 },
                 None => {
-                    if stdout_read > 0 || stderr_read > 0 {
-                        tracing::debug!("Read {stdout_read}b from stdout and {stderr_read}b form stderr");
-                        stdout.extend_from_slice(&stdout_buf[..stdout_read]);
-                        if firstread {
-                            firstread = false;
+                    pollfds[0].set_events(PollFlags::POLLIN);
+                    pollfds[1].set_events(PollFlags::POLLIN);
+                    if poll(&mut pollfds, Some(10_u8))? > 0 {
+                        if pollfds[0].any().unwrap() {
+                            let n = stdout_pipe.read(&mut stdout_buf)?;
+                            debug!("received {} bytes in stdout", n);
+                            stdout.extend_from_slice(&stdout_buf[..n]);
+                            write!(io::stdout(), "{}", String::from_utf8_lossy(&stdout_buf[..n]))?;
                         }
-                        write!(io::stdout(), "{}", String::from_utf8_lossy(&stdout_buf[..stdout_read]))?;
-                        //write!(io::stderr(), "{}", String::from_utf8_lossy(&stderr[stderr.len()-stderr_read..]))?;
-                        stdout.reserve(stdout_read * 2);
-                        stderr.reserve(stderr_read * 2);
+                        if pollfds[1].any().unwrap() {
+                            let n = stderr_pipe.read(&mut stderr_buf)?;
+                            debug!("received {} bytes in stderr", n);
+                            stderr.extend_from_slice(&stderr_buf[..n]);
+                            write!(io::stderr(), "{}", String::from_utf8_lossy(&stderr_buf[..n]))?;
+                        }
                     }
                 },
             }

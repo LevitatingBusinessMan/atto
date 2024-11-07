@@ -109,7 +109,7 @@ mod tui {
     use crossterm::{terminal::*, event::*, ExecutableCommand, QueueableCommand};
     use ratatui::{Terminal, backend::{CrosstermBackend, Backend}};
 
-    pub fn init() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
+    pub fn setup() -> io::Result<()> {
         stdout().execute(EnterAlternateScreen)?;
         enable_raw_mode()?;
         stdout().queue(EnableMouseCapture)?;
@@ -121,6 +121,11 @@ mod tui {
             | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
         ))?;
         stdout().queue(EnableBracketedPaste)?;
+        Ok(())
+    }
+
+    pub fn init() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
+        setup()?;
         Ok(Terminal::new(CrosstermBackend::new(stdout()))?)
     }
 
