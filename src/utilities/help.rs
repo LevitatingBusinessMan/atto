@@ -22,6 +22,7 @@ impl Utility for HelpModel {
         A-n Down
         C-f Find
         C-e Command
+        C-b Shell
        "}, f, area);
     }
 }
