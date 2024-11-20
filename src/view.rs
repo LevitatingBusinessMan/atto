@@ -104,10 +104,11 @@ impl View for Model {
                     std::format!(
                         " {:<} {:>width$} ",
                         "Welcome to Atto! Ctrl-h for help",
-                        std::format!("[{}]", self.buffers.iter().map(
-                            |b| b.name.clone() +
-                            (if b.dirty().unwrap_or_else(|e| {tracing::error!("{:?}", e); true}) { "+" } else { "" })
-                        ).collect::<Vec<String>>().join("|")),
+                        std::format!("{}{} {}/{}",
+                            self.current_buffer().name,
+                            if self.current_buffer().dirty().unwrap_or_else(|e| {tracing::error!("{:?}", e); true}) { "+" } else { "" },
+                            self.selected+1, self.buffers.len(),
+                        ),
                         width = main[1].width as usize - "Welcome to Atto! Ctrl-h for help".len() - 3
                     ),
                     Style::default()
