@@ -53,8 +53,12 @@ impl utilities::Utility for FindModel {
                self.entry.push(c);
                Some(Message::Find(self.entry.clone()))
            },
+           Message::Backspace => {
+            self.entry.pop();
+            Some(Message::Find(self.entry.clone()))
+           },
            // we could do a thing where if it receives an ambigious Message:Next
-           // it can choose to replace it with a Message:NextSelection
+           // it can choose to replace it with a Message:NextSelection or Message::NextHighlight
            msg => Some(msg),
        }
    }

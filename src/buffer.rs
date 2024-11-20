@@ -149,6 +149,14 @@ impl Buffer {
         self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
     }
 
+    pub fn to_top(&mut self) {
+        self.position = 0;
+    }
+
+    pub fn to_bottom(&mut self) {
+        self.position = self.content.len()-1;
+    }
+
     fn start_of_next_line(&self) -> Option<usize> {
         for (index, chr) in self.content[self.position..].chars().enumerate() {
             if chr == '\n' {

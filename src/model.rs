@@ -232,6 +232,14 @@ impl Model {
                         ]
                 )));
             },
+            Message::ToBottom => {
+                self.current_buffer_mut().to_bottom();
+                self.may_scroll = true;
+            },
+            Message::ToTop => {
+                self.current_buffer_mut().to_top();
+                self.may_scroll = true;
+            }
         }
         None
     }
@@ -291,4 +299,6 @@ pub enum Message {
     SaveAsRoot,
     /// can be used just to force update() and view() to run
     NoMessage,
+    ToTop,
+    ToBottom,
 }
