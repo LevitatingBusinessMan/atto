@@ -87,7 +87,7 @@ impl Buffer {
                 break;
             }
             if chr == '\t' {
-                col += crate::parse::TABSIZE as u16;
+                col += crate::parse::whitespace::TABSIZE as u16;
             } else {
                 col += 1;
             }

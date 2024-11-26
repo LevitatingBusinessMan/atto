@@ -27,6 +27,8 @@ pub struct Model {
     pub theme: String,
     pub viewport: Size,
     pub notification: Option<Notification>,
+    /// visualize whitespace
+    pub show_whitespace: bool,
 }
 
 impl Model {
@@ -55,6 +57,7 @@ impl Model {
             theme: "dracula".to_owned(),
             viewport,
             notification: None,
+            show_whitespace: false,
         }
     }
 

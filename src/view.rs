@@ -66,11 +66,13 @@ impl View for Model {
 
         let cache = self.parse_caches.get(&current_buffer.name).unwrap().clone();
 
-        let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache, &self.syntax_set, self.theme()) {
+        let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache, &self.syntax_set, self.theme(), self.show_whitespace) {
             Ok(tokens) => Paragraph::new(tokens),
             Err(e) => {
                 tracing::error!("{:?}", e);
-                // TODO cover tabs here
+                // TODO unless we can cover stuff like tabs and showing whitespace here (and wordwrapping)
+                // we really should rely on our own parse function
+                // and this should be a hard error
                 Paragraph::new(current_buffer.content.as_str()).scroll((current_buffer.top as u16,0))
             },
         };
@@ -157,9 +159,10 @@ impl View for Model {
     }
 }
 
-fn highlight<'a>(buffer: &'a Buffer, height: usize, cache: Rc<RefCell<ParseCache>>, syntax_set: &SyntaxSet, theme: &Theme) -> anyhow::Result<Vec<Line<'a>>> {
+/// Parse and highlight a buffer
+fn highlight<'a>(buffer: &'a Buffer, height: usize, cache: Rc<RefCell<ParseCache>>, syntax_set: &SyntaxSet, theme: &Theme, show_whitespace: bool) -> anyhow::Result<Vec<Line<'a>>> {
     let lines = LinesWithEndings::from(&buffer.content);
     let hl = Highlighter::new(theme);
     let syntax = buffer.syntax.as_ref().unwrap_or(syntax_set.find_syntax_plain_text());
-    parse_from(buffer.top, lines, height, &mut cache.borrow_mut(), &hl, syntax, &syntax_set)
+    parse_from(buffer.top, lines, height, &mut cache.borrow_mut(), &hl, syntax, &syntax_set, show_whitespace)
 }
