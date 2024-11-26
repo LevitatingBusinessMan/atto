@@ -239,7 +239,11 @@ impl Model {
             Message::ToTop => {
                 self.current_buffer_mut().to_top();
                 self.may_scroll = true;
-            }
+            },
+            Message::Tab => {
+                self.current_buffer_mut().insert('\t');
+                self.may_scroll = true;
+            },
         }
         None
     }
@@ -301,4 +305,5 @@ pub enum Message {
     NoMessage,
     ToTop,
     ToBottom,
+    Tab,
 }
