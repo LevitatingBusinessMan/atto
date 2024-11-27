@@ -1,6 +1,8 @@
 use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, sync::{Arc, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{debug, info};
+use unicode_segmentation::UnicodeSegmentation;
+
 
 use crate::parse::*;
 
@@ -26,6 +28,7 @@ pub struct Buffer {
     pub highlights: Vec<(usize, usize)>,
 }
 
+
 impl Buffer {
     pub fn new(name: String, mut file: File, readonly: bool) -> Self {
         let mut content = String::new();
@@ -43,6 +46,16 @@ impl Buffer {
             syntax: None,
             highlights: vec![],
         }
+    }
+
+    /// awful bug fix for a dumb design flaw.
+    /// gets the amount of excess bytes preceding
+    /// the position due to multi-byte graphemes
+    pub fn magic_unicode_offset_bug_fix(&self) -> usize {
+         self.content.grapheme_indices(true)
+            .filter(|(i, s)| i < &self.position && s.len() > 1)
+            .fold(0, |a, (_i, s)| a + s.len() - 1);
+        return 0
     }
 
     pub fn empty() -> Self {
@@ -245,7 +258,7 @@ impl Buffer {
 
     pub fn insert(&mut self, chr: char) {
         if !self.readonly {
-            self.content.insert(self.position, chr);
+            self.content.insert(self.position + self.magic_unicode_offset_bug_fix(), chr);
             self.move_right();
             // invalidating from top is faster than figuring out the current line
             // and you render from the top anyway

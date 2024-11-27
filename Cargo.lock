@@ -127,6 +127,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tui-logger",
+ "unicode-segmentation",
 ]
 
 [[package]]
