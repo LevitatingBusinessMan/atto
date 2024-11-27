@@ -1,6 +1,7 @@
 use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, sync::{Arc, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{debug, info};
+use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 
 use crate::parse::*;
 
@@ -11,7 +12,7 @@ pub struct Buffer {
     pub name: String,
     pub content: String,
     pub file: Option<Arc<Mutex<File>>>,
-    pub position: usize,
+    pub position: GraphemeCursor,
     /// the file was opened as readonly
     pub opened_readonly: bool,
     /// This buffer shall not be edited
@@ -101,12 +102,18 @@ impl Buffer {
 
     pub fn move_left(&mut self) {
         self.prefered_col = None;
-        self.position = self.position.saturating_sub(1);
+        let prev = self.position.next_boundary(&self.content, 0)
+            .unwrap_or(None)
+            .unwrap_or(self.position.cur_cursor());
+        self.position.set_cursor(next);
     }
     
     pub fn move_right(&mut self) {
         self.prefered_col = None;
-        self.position = cmp::min(self.position + 1, self.content.len());
+        let next = self.position.next_boundary(&self.content, 0)
+            .unwrap_or(None)
+            .unwrap_or(self.position.cur_cursor());
+        self.position.set_cursor(next);
     }
     
     pub fn move_up(&mut self) {
