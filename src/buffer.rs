@@ -13,7 +13,12 @@ pub struct Buffer {
     pub name: String,
     pub content: String,
     pub file: Option<Arc<Mutex<File>>>,
+	/// cursors byte index into the buffer
     pub position: usize,
+	/// visual (grapheme) cursor position
+	pub cursor: Cursor,
+	/// the indexes of all the beginnings of lines
+	pub linestarts: Vec<usize>,
     /// the file was opened as readonly
     pub opened_readonly: bool,
     /// This buffer shall not be edited
@@ -28,16 +33,33 @@ pub struct Buffer {
     pub highlights: Vec<(usize, usize)>,
 }
 
+fn generate_linestarts(content: &str) -> Vec<usize> {
+    let mut ns: Vec<usize> = vec![0];
+    ns.extend(content.bytes().enumerate().filter_map(|(i, b)| if b == b'\n' {Some(i+1)} else {None}));
+    //if content.chars().last().is_some_and(|c| c != '\n') { ns.push(content.len()) }
+    ns.push(content.len());
+    ns
+}
+
+//* The column and line of the cursor, starting at (0,0) */
+#[derive(Debug, Clone, Copy)]
+pub struct Cursor {
+    pub x: usize,
+    pub y: usize,
+}
 
 impl Buffer {
     pub fn new(name: String, mut file: File, readonly: bool) -> Self {
         let mut content = String::new();
         file.read_to_string(&mut content).unwrap();
+        let linestarts = generate_linestarts(&content);
         return Self {
             name,
             content: content,
             file: Some(Arc::new(Mutex::new(file))),
             position: 0,
+            cursor: Cursor { x: 0, y: 0 },
+            linestarts,
             readonly: false,
             opened_readonly: readonly,
             top: 0,
@@ -58,12 +80,87 @@ impl Buffer {
         return 0
     }
 
+	/// number of excess bytes between two points caused
+	/// by multi-byte graphemes
+    pub fn excess_bytes(&self, start: usize, end: usize) -> usize {
+        let chunk = &self.content[start..end];
+        return chunk.len() - chunk.graphemes(true).count();
+    }
+
+    /// update byte position based on the cursor,
+    /// assumes the cursor is valid
+    pub fn update_position(&mut self) {
+        debug!("cc {:?}", self.cursor);
+        debug!("newlines {:?}", self.linestarts);
+        debug!("{:?}", self.content);
+        let (start, end) = self.current_line();
+        debug!("cl {} {} ", start, end);
+        let offset = self.content[start..end].grapheme_indices(true).nth(self.cursor.x).unwrap_or_else(|| (self.current_line_grapheme_length(), "")).0;
+        self.position = start + offset;
+        debug!("offset and pos {} {}", offset, self.position);
+    }
+
+    /// update cursor based on the byte position
+    pub fn update_cursor(&mut self) {
+    }
+
+
+    /// current line start and end using only self.cursor.y
+    pub fn current_line(&self) -> (usize, usize) {
+        return (self.linestarts[self.cursor.y], self.linestarts[self.cursor.y+1]);
+    }
+
+    /// length of current line in bytes
+    pub fn current_line_length(&self) -> usize {
+        let (start, end) = self.current_line();
+        end - start
+    }
+
+    /// length of current line in grapheme cluster
+    pub fn current_line_grapheme_length(&self) -> usize {
+        self.current_line_str().graphemes(true).count()
+    }
+
+    pub fn current_line_str(&self) -> &str {
+        &self.content[self.linestarts[self.cursor.y]..self.linestarts[self.cursor.y+1]]
+    }
+
+    /// this one use self.position, so do not use it to calculate the position (please)
+    pub fn current_line_str_before_cursor(&self) -> &str {
+        &self.content[self.linestarts[self.cursor.y]..self.position]
+    }
+
+    pub fn is_last_line(&self) -> bool {
+        self.cursor.y + 2 == self.linestarts.len()
+    }
+
+    pub fn is_end_of_line(&self) -> bool {
+        let line_len = self.current_line_grapheme_length();
+        debug!("ll {}", line_len);
+        debug!("isll{}", self.is_last_line());
+        if self.is_last_line() && !self.whitespace_terminated() {
+            self.cursor.x == line_len
+        } else {
+            self.cursor.x == line_len.saturating_sub(1)
+        }
+    }
+
+    pub fn whitespace_terminated(&self) -> bool {
+        if let Some(c) = self.content.chars().rev().next() {
+            c.is_whitespace()
+        } else {
+            false
+        }
+    }
+    
     pub fn empty() -> Self {
         return Self {
             name: "".to_string(),
             content: String::new(),
             file: None,
             position: 0,
+            cursor: Cursor { x: 0, y: 0 },
+            linestarts: vec![0],
             readonly: false,
             opened_readonly: false,
             top: 0,
@@ -92,36 +189,44 @@ impl Buffer {
     }
 
     /// Get position as column and row (of the total buffer not the viewport)
-    pub fn cursor_pos(&self) -> (u16, u16) {
-        let mut row = 0;
-        let mut col = 0;
-        for (index, chr) in self.content.chars().enumerate() {
-            if index >= self.position {
-                break;
-            }
-            if chr == '\t' {
-                col += crate::parse::whitespace::TABSIZE as u16;
-            } else {
-                col += 1;
-            }
-            if chr == '\n' {
-                row += 1;
-                col = 0;
-            }
-        }
-        return (col, row)
-    }
+    // pub fn cursor_pos(&self) -> (u16, u16) {
+    //     let mut row = 0;
+    //     let mut col = 0;
+    //     for (index, chr) in self.content.chars().enumerate() {
+    //         if index >= self.position {
+    //             break;
+    //         }
+    //         if chr == '\t' {
+    //             col += crate::parse::whitespace::TABSIZE as u16;
+    //         } else {
+    //             col += 1;
+    //         }
+    //         if chr == '\n' {
+    //             row += 1;
+    //             col = 0;
+    //         }
+    //     }
+    //     return (col, row)
+    // }
 
     pub fn move_left(&mut self) {
         self.prefered_col = None;
-        self.position = self.position.saturating_sub(1);
+        self.cursor.x = self.cursor.x.saturating_sub(1);
+        self.update_position();
     }
-    
+
+    /// move a column to the right
     pub fn move_right(&mut self) {
-        self.prefered_col = None;
-        self.position = cmp::min(self.position + 1, self.content.len());
+        if !self.is_end_of_line() {
+            self.prefered_col = None;
+            self.cursor.x += 1;
+            self.update_position();
+        } else if !self.is_last_line() {
+            self.prefered_col = Some(0);
+            self.move_down();
+        } 
     }
-    
+
     pub fn move_up(&mut self) {
         let start_of_line = self.start_of_line();
         let prefered_col = self.prefered_col.unwrap_or(self.position.saturating_sub(start_of_line));
@@ -134,32 +239,33 @@ impl Buffer {
             self.position = start_of_line;
         }
     }
-    
+
     pub fn move_down(&mut self) {
-        let prefered_col = self.prefered_col.unwrap_or(self.position.saturating_sub(self.start_of_line()));
-        if let Some(start_of_next_line) = self.start_of_next_line() {
-            self.position = start_of_next_line;
-            let start_of_next_next_line = self.start_of_next_line().unwrap_or(self.content.len());
-            let next_line_length = start_of_next_next_line.saturating_sub(start_of_next_line + 1);
-            self.position = cmp::min(start_of_next_line + prefered_col, start_of_next_line + next_line_length);
-            self.prefered_col = Some(prefered_col);
-        } else {
-            self.position = self.content.len();
+        if self.is_last_line() {
+            return
         }
+        self.cursor.y += 1;
+        let prefered_col = self.prefered_col.unwrap_or(self.cursor.x);
+        let mut line_length = self.current_line_grapheme_length();
+        if self.is_last_line() && !self.whitespace_terminated() {
+            line_length += 1;
+        }
+        self.cursor.x = cmp::min(prefered_col, line_length);
+        self.update_position();
     }
 
     pub fn page_up(&mut self, height: usize) {
-        let (col, mut row) = self.cursor_pos();
-        row = row.saturating_sub(self.top as u16);
-        self.top = self.top.saturating_sub(height);
-        self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
+        // let (col, mut row) = self.cursor_pos();
+        // row = row.saturating_sub(self.top as u16);
+        // self.top = self.top.saturating_sub(height);
+        // self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
     }
-    
+
     pub fn page_down(&mut self, height: usize) {
-        let (col, mut row) = self.cursor_pos();
-        row = row.saturating_sub(self.top as u16);
-        self.top = cmp::min(self.top + height - 1, self.content.lines().count().saturating_sub(height) + 1);
-        self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
+        // let (col, mut row) = self.cursor_pos();
+        // row = row.saturating_sub(self.top as u16);
+        // self.top = cmp::min(self.top + height - 1, self.content.lines().count().saturating_sub(height) + 1);
+        // self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
     }
 
     pub fn to_top(&mut self) {
@@ -245,11 +351,8 @@ impl Buffer {
     }
 
     pub fn goto_end_of_line(&mut self) {
-        self.position = match self.start_of_next_line() {
-            Some(start_of_next_line) => start_of_next_line - 1,
-            None => self.content.len(),
-        };
         self.prefered_col = None;
+        self.cursor.x = self.current_line_length();
     }
 
     fn current_char(&self) -> char {
@@ -258,10 +361,11 @@ impl Buffer {
 
     pub fn insert(&mut self, chr: char) {
         if !self.readonly {
-            self.content.insert(self.position + self.magic_unicode_offset_bug_fix(), chr);
+            self.content.insert(self.position, chr);
+            // TODO do not blindly generate linestarts
+            self.linestarts = generate_linestarts(&self.content);
             self.move_right();
-            // invalidating from top is faster than figuring out the current line
-            // and you render from the top anyway
+            // TODO can I invalidate from the current line instead?
             self.parse_cache.invalidate_from(self.top);
         }
     }
@@ -361,7 +465,42 @@ impl Buffer {
             self.prefered_col = None;
             self.content.insert_str(self.position, content);
             self.position += content.len();
+            self.linestarts = generate_linestarts(&self.content);
         }
     }
 
+}
+
+#[test]
+fn snowman() {
+    let mut buf = Buffer::empty();
+    buf.paste("here is ☃ snowman");
+    //println!("{:?}", generate_newlines(&buf.content));
+    buf.position = 0;
+    for _ in 0..12 {
+        buf.move_right();
+    }
+    assert!(buf.position == 12 + String::from("☃").len() - 1);
+}
+
+#[test]
+fn linestarts() {
+    let mut buf = Buffer::empty();
+    buf.paste(
+"123
+123
+");
+    println!("{:?}", buf.linestarts);
+    assert!(buf.linestarts == vec![0,4,8]);
+}
+
+#[test]
+fn linestarts_snowman() {
+    let mut buf = Buffer::empty();
+    buf.paste(
+"1☃3
+123
+");
+    println!("{:?}", buf.linestarts);
+    assert!(buf.linestarts == vec![0,6,10]);
 }

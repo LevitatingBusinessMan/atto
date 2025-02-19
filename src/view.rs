@@ -47,13 +47,13 @@ impl View for Model {
         // Scroll the buffer if the cursor was moved out of view.
         {
             let may_scroll = self.may_scroll;
+            let cursor_y = self.current_buffer().cursor.y;
             let current_buffer = self.current_buffer_mut();
-            let (_, cursor_y) = current_buffer.cursor_pos();
             if may_scroll {
-                if cursor_y < current_buffer.top as u16 {
+                if cursor_y < current_buffer.top {
                     current_buffer.top = cursor_y as usize;
-                } else if cursor_y >= current_buffer.top as u16 + buffer_and_scrollbar[0].height {
-                    let diff = cursor_y - (current_buffer.top as u16 + buffer_and_scrollbar[0].height);
+                } else if cursor_y >= current_buffer.top + buffer_and_scrollbar[0].height as usize{
+                    let diff = cursor_y - (current_buffer.top + buffer_and_scrollbar[0].height as usize);
                     current_buffer.top += diff as usize + 1;
                 }
             }
@@ -61,8 +61,6 @@ impl View for Model {
         }
 
         let current_buffer = self.current_buffer();
-
-        let (cursor_x, cursor_y) = current_buffer.cursor_pos();
 
         let cache = self.parse_caches.get(&current_buffer.name).unwrap().clone();
 
@@ -82,8 +80,9 @@ impl View for Model {
             buffer_and_scrollbar[0]
         );
 
-        if cursor_y >= self.current_buffer().top as u16 {
-            f.set_cursor_position((cursor_x, cursor_y - self.current_buffer().top as u16));
+        // if in view, display cursor
+        if self.current_buffer().cursor.y >= self.current_buffer().top {
+            f.set_cursor_position((self.current_buffer().cursor.x as u16, self.current_buffer().cursor.y as u16 - self.current_buffer().top as u16));
         }
 
         let scrollbar = Scrollbar::default();
@@ -106,7 +105,10 @@ impl View for Model {
                     std::format!(
                         " {:<} {:>width$} ",
                         "Welcome to Atto! Ctrl-h for help",
-                        std::format!("{}{} {}/{}",
+                        std::format!("({}/{}) at b{} {}{} {}/{}",
+                            self.current_buffer().cursor.x + 1,
+                            self.current_buffer().cursor.y + 1,
+                            self.current_buffer().position,
                             self.current_buffer().name,
                             if self.current_buffer().dirty().unwrap_or_else(|e| {tracing::error!("{:?}", e); true}) { "+" } else { "" },
                             self.selected+1, self.buffers.len(),
