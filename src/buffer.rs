@@ -41,6 +41,14 @@ fn generate_linestarts(content: &str) -> Vec<usize> {
     ns
 }
 
+// pub fn generate_linestarts_textwrap(content: &str, width: usize) -> Vec<usize> {
+//     let mut ns: Vec<usize> = vec![0];
+//     ns.extend(content.bytes().enumerate().filter_map(|(i, b)| if b == b'\n' {Some(i+1)} else {None}));
+//     //if content.chars().last().is_some_and(|c| c != '\n') { ns.push(content.len()) }
+//     ns.push(content.len());
+//     ns
+// }
+
 //* The column and line of the cursor, starting at (0,0) */
 #[derive(Debug, Clone, Copy)]
 pub struct Cursor {
@@ -68,6 +76,14 @@ impl Buffer {
             syntax: None,
             highlights: vec![],
         }
+    }
+
+    pub fn textwrap(&mut self, width: usize) {
+        self.linestarts.windows(2);
+    }
+
+    pub fn increase_all_linestarts(&mut self, from: usize, n: usize) {
+        self.linestarts.iter_mut().for_each(|ls| if from >= *ls { *ls = ls.saturating_add(n) });
     }
 
     /// awful bug fix for a dumb design flaw.
@@ -245,7 +261,7 @@ impl Buffer {
             line_length += 1;
         }
         if self.prefered_col.is_none() { self.prefered_col = Some(self.cursor.x); }
-        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length - 1);
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
         self.update_position();
     }
 

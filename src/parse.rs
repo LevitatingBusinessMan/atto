@@ -7,7 +7,9 @@ use ratatui::text::{Span, Line};
 use syntect::parsing::{ParseState, SyntaxReference, ScopeStack, SyntaxSet};
 use syntect::highlighting::{HighlightState, Highlighter, HighlightIterator};
 use syntect::util::LinesWithEndings;
-use tracing::debug;
+use tracing::{debug, trace};
+use tracing_subscriber::field::debug;
+use unicode_segmentation::UnicodeSegmentation;
 use crate::syntect_tui::{self, SyntectTuiError};
 
 const CACHE_FREQUENCY: usize = 10;
@@ -95,7 +97,45 @@ pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, ca
                 s.bg(ratatui::style::Color::Reset)
             }).collect();
 
-            lexemes.push(Line::from(spans));
+            let breaks = crate::wrap::get_linebreak_locations(&line, 10000);
+            // this is the glorious linebreak span insertion apparatus
+            // given a list of spans and a list of linebreaks
+            // it will generate broken lines
+            if breaks.len() > 0 {
+                let mut new_spans = vec![];
+                let mut break_i = 0;
+                let mut row = 0;
+                'outer: for i in 0..spans.len() {
+                    let span = &spans[i];
+                    let span_len = spans[i].content.graphemes(true).count();
+                    // check if no break occurs in this span
+                    if row + span_len < breaks[break_i] {
+                        new_spans.push(spans[i].clone());
+                    } else {
+                        let mut span_deepness = 0;
+                        // loop through span to split it up
+                        loop {
+                            let style = spans[i].style;
+                            debug!("deepenss {} break {}", span_deepness, break_i);
+                            new_spans.push(Span::styled(span.content[span_deepness..breaks[break_i]].to_owned(), style));
+                            lexemes.push(Line::from(new_spans));
+                            new_spans = vec![];
+                            span_deepness = breaks[break_i] - row;
+                            break_i += 1;
+                            if break_i >= breaks.len() {
+                                debug!("deepenss {} end", span_deepness);
+                                new_spans.push(Span::styled(span.content[span_deepness..].to_owned(), style));
+                                lexemes.push(Line::from(new_spans.clone()));
+                                break 'outer;
+                            }
+                        }
+                    }
+                    row += span_len;
+                    lexemes.push(Line::from(new_spans.clone()));
+                }
+            } else {
+                lexemes.push(Line::from(spans));
+            }
         }
 
         if line_no > from+limit {
@@ -121,4 +161,3 @@ impl CachedParseState {
         }
     }
 }
-
