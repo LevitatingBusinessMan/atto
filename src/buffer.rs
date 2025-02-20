@@ -1,10 +1,10 @@
 use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, sync::{Arc, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{debug, info};
-use unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 
 
-use crate::parse::*;
+use crate::{logging::LogError, parse::*};
 
 pub static PRIVESC_CMD: &'static str = "run0";
 
@@ -56,6 +56,21 @@ pub struct Cursor {
     pub y: usize,
 }
 
+/// how much columns to use for this grapheme cluster
+pub fn grapheme_width(gr: &str) -> usize {
+    if gr.chars().any(|c| c == '\t') {
+        crate::parse::whitespace::TABSIZE
+    } else {
+        1
+    }
+}
+
+/// the amount of columsn a str will take,
+/// so grapheme clusters plus tab slots
+pub fn str_column_length(s: &str) -> usize {
+    s.graphemes(true).fold(0, |a,gr| a + grapheme_width(gr))
+}
+
 impl Buffer {
     pub fn new(name: String, mut file: File, readonly: bool) -> Self {
         let mut content = String::new();
@@ -76,10 +91,6 @@ impl Buffer {
             syntax: None,
             highlights: vec![],
         }
-    }
-
-    pub fn textwrap(&mut self, width: usize) {
-        self.linestarts.windows(2);
     }
 
     pub fn increase_all_linestarts(&mut self, from: usize, n: usize) {
@@ -106,13 +117,20 @@ impl Buffer {
     /// update byte position based on the cursor,
     /// assumes the cursor is valid
     pub fn update_position(&mut self) {
-        let (start, end) = self.current_line();
-        let offset = self.content[start..end].grapheme_indices(true).nth(self.cursor.x).unwrap_or_else(|| (self.current_line_grapheme_length(), "")).0;
-        self.position = start + offset;
+        let injected_columns = str_column_length(self.current_line_str()) - self.current_line_grapheme_count();
+        let offset = self.current_line_str().grapheme_indices(true).nth(self.cursor.x - injected_columns).unwrap_or_else(|| (self.current_line_grapheme_count(), "")).0;
+        self.position = self.linestarts[self.cursor.y] + offset;
     }
 
     /// update cursor based on the byte position
     pub fn update_cursor(&mut self) {
+        for (i, win) in self.linestarts.windows(2).enumerate() {
+            if win[1] > self.position {
+                self.cursor.y = i;
+                self.cursor.x = str_column_length(self.current_line_str_before_cursor());
+                break;
+            }
+        }
     }
 
 
@@ -128,7 +146,7 @@ impl Buffer {
     }
 
     /// length of current line in grapheme clusters
-    pub fn current_line_grapheme_length(&self) -> usize {
+    pub fn current_line_grapheme_count(&self) -> usize {
         self.current_line_str().graphemes(true).count()
     }
 
@@ -152,7 +170,7 @@ impl Buffer {
     }
 
     pub fn is_end_of_line(&self) -> bool {
-        let line_len = self.current_line_grapheme_length();
+        let line_len = self.current_line_grapheme_count();
         debug!("ll {}", line_len);
         debug!("isll{}", self.is_last_line());
         if self.is_last_line() && !self.whitespace_terminated() {
@@ -226,23 +244,48 @@ impl Buffer {
     //     return (col, row)
     // }
 
+    /// return the previous grapheme string and boundary
+    pub fn prev_grapheme(&self) -> Option<(&str, usize)> {
+        let begin_prev_line = self.linestarts[self.cursor.y.saturating_sub(1)];
+        let str = &self.content[begin_prev_line..self.position];
+        let mut gcursor = GraphemeCursor::new(self.position, self.content.len(), true);
+        match gcursor.prev_boundary(str, begin_prev_line).log() {
+            Ok(Some(pb)) => {
+                Some((&self.content[pb..self.position], pb))
+            },
+            Ok(None) | Err(_) => None,
+        }
+    }
+
+    pub fn cur_grapheme(&self) -> Option<&str> {
+        let str = &self.content[
+            self.position..
+            self.linestarts[cmp::min(self.cursor.y + 2, self.linestarts.len() - 1)]
+        ];
+        let mut gcursor = GraphemeCursor::new(self.position, self.content.len(), true);
+        match gcursor.next_boundary(str, self.position).log() {
+            Ok(Some(pb)) => {
+                Some(&self.content[self.position..pb])
+            },
+            Ok(None) | Err(_) => None,
+        }
+    }
+    /// move left to previous grapheme cluster
     pub fn move_left(&mut self) {
-        self.prefered_col = None;
-        self.cursor.x = self.cursor.x.saturating_sub(1);
-        self.update_position();
+        if let Some((_s, i)) = self.prev_grapheme() {
+            self.position = i;
+            self.prefered_col = None;
+            self.update_cursor();
+        }
     }
 
     /// move to next grapheme cluster
     pub fn move_right(&mut self) {
-        if !self.is_end_of_line() {
+        if let Some(s) = self.cur_grapheme() {
+            self.position += s.len();
             self.prefered_col = None;
-            self.cursor.x += 1;
-            self.update_position();
-        } else if !self.is_last_line() {
-            self.prefered_col = Some(0);
-            debug!("{:?}", self.prefered_col);
-            self.move_down();
-        } 
+            self.update_cursor();
+        }
     }
 
     // OLD cursor based move_right behaviour
@@ -259,17 +302,13 @@ impl Buffer {
     // }
     
 
+    /// move up a row
     pub fn move_up(&mut self) {
-        let start_of_line = self.start_of_line();
-        let prefered_col = self.prefered_col.unwrap_or(self.position.saturating_sub(start_of_line));
-
-        if let Some(start_of_prev_line) = self.start_of_prev_line() {
-            let previous_line_length = start_of_line.saturating_sub(start_of_prev_line+1);
-            self.position = cmp::min(start_of_prev_line + prefered_col, start_of_prev_line + previous_line_length);
-            self.prefered_col = Some(prefered_col);
-        } else {
-            self.position = start_of_line;
-        }
+        if self.prefered_col.is_none() { self.prefered_col = Some(self.cursor.x); }
+        self.cursor.y = self.cursor.y.saturating_sub(1);
+        let line_length = str_column_length(self.current_line_str());
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+        self.update_position();
     }
 
     /// move down a row
@@ -278,7 +317,7 @@ impl Buffer {
         if self.prefered_col.is_none() { self.prefered_col = Some(self.cursor.x); }
         self.cursor.y += 1;
         self.cursor.x = 0;
-        let line_length = self.current_line_grapheme_length();
+        let line_length = str_column_length(self.current_line_str());
         self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
         self.update_position();
     }
