@@ -127,10 +127,16 @@ impl Buffer {
         end - start
     }
 
-    /// length of current line in grapheme cluster
+    /// length of current line in grapheme clusters
     pub fn current_line_grapheme_length(&self) -> usize {
         self.current_line_str().graphemes(true).count()
     }
+
+    /// length of current line in grapheme clusters excluding linebreak
+    // pub fn current_line_grapheme_length_no_lb(&self) -> usize {
+    //     let str = self.current_line_str();
+    //     if str.graph
+    // }
 
     pub fn current_line_str(&self) -> &str {
         &self.content[self.linestarts[self.cursor.y]..self.linestarts[self.cursor.y+1]]
@@ -226,7 +232,7 @@ impl Buffer {
         self.update_position();
     }
 
-    /// move a column to the right
+    /// move to next grapheme cluster
     pub fn move_right(&mut self) {
         if !self.is_end_of_line() {
             self.prefered_col = None;
@@ -234,9 +240,24 @@ impl Buffer {
             self.update_position();
         } else if !self.is_last_line() {
             self.prefered_col = Some(0);
+            debug!("{:?}", self.prefered_col);
             self.move_down();
         } 
     }
+
+    // OLD cursor based move_right behaviour
+    // /// move a column to the right
+    // pub fn move_right(&mut self) {
+    //     if !self.is_end_of_line() {
+    //         self.prefered_col = None;
+    //         self.cursor.x += 1;
+    //         self.update_position();
+    //     } else if !self.is_last_line() {
+    //         self.prefered_col = Some(0);
+    //         self.move_down();
+    //     } 
+    // }
+    
 
     pub fn move_up(&mut self) {
         let start_of_line = self.start_of_line();
@@ -251,16 +272,14 @@ impl Buffer {
         }
     }
 
+    /// move down a row
     pub fn move_down(&mut self) {
-        if self.is_last_line() {
-            return
-        }
+        if self.is_last_line() { return }
         if self.prefered_col.is_none() { self.prefered_col = Some(self.cursor.x); }
         self.cursor.y += 1;
         self.cursor.x = 0;
         let line_length = self.current_line_grapheme_length();
-        if self.is_last_line() { return }
-        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length - 1);
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
         self.update_position();
     }
 
