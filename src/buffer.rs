@@ -341,18 +341,21 @@ impl Buffer {
     }
 
     pub fn page_up(&mut self, height: usize) {
-        // let (col, mut row) = self.cursor_pos();
-        // row = row.saturating_sub(self.top as u16);
-        // self.top = self.top.saturating_sub(height);
-        // self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
+        self.top = self.top.saturating_sub(height);
+        self.cursor.y = self.cursor.y.saturating_sub(height);
+        let line_length = str_column_length(self.current_line_str());
+        self.prefered_col = Some(self.prefered_col.unwrap_or(self.cursor.x));
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+        self.update_position();
     }
 
     pub fn page_down(&mut self, height: usize) {
-        // self.cursor.y = self.cursor.y.saturating_sub(self.top);
-        // let line_length = str_column_length(self.current_line_str());
-        // self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
-        // self.top = cmp::min(self.top + height - 1, self.linestarts.len());
-        // self.update_position();
+        self.top = cmp::min(self.top + height, self.linestarts.len() - height);
+        self.cursor.y = cmp::min(self.cursor.y + height, self.linestarts.len() - 2);
+        let line_length = str_column_length(self.current_line_str());
+        self.prefered_col = Some(self.prefered_col.unwrap_or(self.cursor.x));
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+        self.update_position();
     }
 
     pub fn to_top(&mut self) {
@@ -396,6 +399,7 @@ impl Buffer {
         return Some(0);
     }
 
+    // TODO rewrite to match new utilities
     pub fn move_word_left(&mut self) {
         let mut next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
         if next.is_whitespace() {
@@ -418,6 +422,7 @@ impl Buffer {
         self.update_cursor();
     }
 
+    // TODO rewrite to match new utilities
     pub fn move_word_right(&mut self) {
         if self.current_char().is_whitespace() {
             while self.current_char().is_whitespace() && self.position+1 != self.content.len() && self.current_char() != '\n' {
