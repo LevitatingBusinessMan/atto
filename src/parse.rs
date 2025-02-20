@@ -70,11 +70,18 @@ pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, ca
         
         let spans: Result<Vec<Span>, SyntectTuiError> = iter.map(|t| syntect_tui::into_span(t)).collect();
         
+        // I need some kind of global preprocessor here
+        // it will move whitespace to seperate spans (also color them)
+        // then it will replace parts of spans (tabs with 4 spaces, whitespace with symbols)
+        // those replacents should be registered somewhere, so other functions can replicate
+        // the line length difference
+        // the functions that use that are str_column_length and crate::wrap::get_linebreak_locations
+
         if line_no >= from {
             // Remove background color and handle whitespace chars
             let spans: Vec<Span> = spans?.into_iter().map(|mut s| {
                 // not all parsers create separate spans for the whitespace
-                // I have to figure out a method to insert spans
+                // I have to figure out a method to break up spans
                 // otherwise I cannot color the whitespace appropiately
                 match show_whitespace {
                     true => {
