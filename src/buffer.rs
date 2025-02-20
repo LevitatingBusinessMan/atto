@@ -233,11 +233,10 @@ impl Buffer {
 
     /// Set the position into the buffer based on a location on the viewport
     pub fn set_viewport_cursor_pos(&mut self, x: u16, y: u16) {
-        let mut newlineiter = self.content.chars().enumerate().filter_map(|(i, c)| if c == '\n' || i == 0 {Some(i)} else {None}).skip(self.top + y as usize);
-        let mut linestart = newlineiter.next().unwrap_or(0);
-        if linestart == 0 { linestart = 0 } else { linestart += 1 };
-        self.position = cmp::min(cmp::min(linestart + x as usize, newlineiter.next().unwrap_or(usize::MAX)), self.content.len());
+        self.cursor.y = self.top + y as usize;
         self.prefered_col = Some(x as usize);
+        self.place_cursor_x(x as usize);
+        self.update_position();
     }
 
     /// Get position as column and row (of the total buffer not the viewport)
@@ -319,42 +318,42 @@ impl Buffer {
     // }
     
 
+    /// place the x cursor anywhere on the line,
+    /// assuming cursor.y is set this will move it to position or eol
+    /// and handle the preferred_col
+    pub fn place_cursor_x(&mut self, x: usize) {
+        let line_length = str_column_length(self.current_line_str());
+        self.prefered_col = Some(self.prefered_col.unwrap_or(x));
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+    }
+
     /// move up a row
     pub fn move_up(&mut self) {
         if self.is_first_line() { self.goto_start_of_line(); return }
-        if self.prefered_col.is_none() { self.prefered_col = Some(self.cursor.x); }
         self.cursor.y = self.cursor.y.saturating_sub(1);
-        let line_length = str_column_length(self.current_line_str());
-        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+        self.place_cursor_x(self.cursor.x);
         self.update_position();
     }
 
     /// move down a row
     pub fn move_down(&mut self) {
         if self.is_last_line() { self.goto_end_of_line(); return }
-        if self.prefered_col.is_none() { self.prefered_col = Some(self.cursor.x) }
         self.cursor.y += 1;
-        //self.cursor.x = 0;
-        let line_length = str_column_length(self.current_line_str());
-        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+        self.place_cursor_x(self.cursor.x);
         self.update_position();
     }
 
     pub fn page_up(&mut self, height: usize) {
         self.top = self.top.saturating_sub(height);
         self.cursor.y = self.cursor.y.saturating_sub(height);
-        let line_length = str_column_length(self.current_line_str());
-        self.prefered_col = Some(self.prefered_col.unwrap_or(self.cursor.x));
-        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+        self.place_cursor_x(self.cursor.x);
         self.update_position();
     }
 
     pub fn page_down(&mut self, height: usize) {
         self.top = cmp::min(self.top + height, self.linestarts.len() - height);
         self.cursor.y = cmp::min(self.cursor.y + height, self.linestarts.len() - 2);
-        let line_length = str_column_length(self.current_line_str());
-        self.prefered_col = Some(self.prefered_col.unwrap_or(self.cursor.x));
-        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+        self.place_cursor_x(self.cursor.x);
         self.update_position();
     }
 
