@@ -1,10 +1,10 @@
 use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, sync::{Arc, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{debug, info};
-use unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::{GraphemeCursor, GraphemeIndices, UnicodeSegmentation};
 
 
-use crate::parse::*;
+use crate::{logging::LogError, parse::*};
 
 pub static PRIVESC_CMD: &'static str = "run0";
 
@@ -13,7 +13,12 @@ pub struct Buffer {
     pub name: String,
     pub content: String,
     pub file: Option<Arc<Mutex<File>>>,
+	/// cursors byte index into the buffer
     pub position: usize,
+	/// visual (grapheme) cursor position
+	pub cursor: Cursor,
+	/// the indexes of all the beginnings of lines
+	pub linestarts: Vec<usize>,
     /// the file was opened as readonly
     pub opened_readonly: bool,
     /// This buffer shall not be edited
@@ -28,16 +33,56 @@ pub struct Buffer {
     pub highlights: Vec<(usize, usize)>,
 }
 
+fn generate_linestarts(content: &str) -> Vec<usize> {
+    let mut ns: Vec<usize> = vec![0];
+    ns.extend(content.bytes().enumerate().filter_map(|(i, b)| if b == b'\n' {Some(i+1)} else {None}));
+    //if content.chars().last().is_some_and(|c| c != '\n') { ns.push(content.len()) }
+    ns.push(content.len());
+    ns
+}
+
+// pub fn generate_linestarts_textwrap(content: &str, width: usize) -> Vec<usize> {
+//     let mut ns: Vec<usize> = vec![0];
+//     ns.extend(content.bytes().enumerate().filter_map(|(i, b)| if b == b'\n' {Some(i+1)} else {None}));
+//     //if content.chars().last().is_some_and(|c| c != '\n') { ns.push(content.len()) }
+//     ns.push(content.len());
+//     ns
+// }
+
+//* The column and line of the cursor, starting at (0,0) */
+#[derive(Debug, Clone, Copy)]
+pub struct Cursor {
+    pub x: usize,
+    pub y: usize,
+}
+
+/// how much columns to use for this grapheme cluster
+pub fn grapheme_width(gr: &str) -> usize {
+    if gr.chars().any(|c| c == '\t') {
+        crate::parse::whitespace::TABSIZE
+    } else {
+        1
+    }
+}
+
+/// the amount of columsn a str will take,
+/// so grapheme clusters plus tab slots
+pub fn str_column_length(s: &str) -> usize {
+    s.graphemes(true).fold(0, |a,gr| a + grapheme_width(gr))
+}
 
 impl Buffer {
     pub fn new(name: String, mut file: File, readonly: bool) -> Self {
         let mut content = String::new();
         file.read_to_string(&mut content).unwrap();
+        let linestarts = generate_linestarts(&content);
         return Self {
             name,
             content: content,
             file: Some(Arc::new(Mutex::new(file))),
             position: 0,
+            cursor: Cursor { x: 0, y: 0 },
+            linestarts,
             readonly: false,
             opened_readonly: readonly,
             top: 0,
@@ -46,6 +91,10 @@ impl Buffer {
             syntax: None,
             highlights: vec![],
         }
+    }
+
+    pub fn increase_all_linestarts(&mut self, from: usize, n: usize) {
+        self.linestarts.iter_mut().for_each(|ls| if from >= *ls { *ls = ls.saturating_add(n) });
     }
 
     /// awful bug fix for a dumb design flaw.
@@ -58,12 +107,112 @@ impl Buffer {
         return 0
     }
 
+	/// number of excess bytes between two points caused
+	/// by multi-byte graphemes
+    pub fn excess_bytes(&self, start: usize, end: usize) -> usize {
+        let chunk = &self.content[start..end];
+        return chunk.len() - chunk.graphemes(true).count();
+    }
+
+    /// update byte position based on the cursor
+    /// the cursor must be within bounds, but if it sits on a tab (or similar)
+    /// it will move to the right
+    pub fn update_position(&mut self) {
+        let line_graphemes: Vec<&str> = self.current_line_str().graphemes(true).collect();
+        let mut pos = 0;
+        let mut col = 0;
+        for gr in line_graphemes {
+            if col >= self.cursor.x {
+                self.cursor.x = col;
+                break;
+            }
+            col += grapheme_width(gr);
+            pos += gr.len();
+        }
+        self.position = self.linestarts[self.cursor.y] + pos;
+    }
+
+    /// update cursor based on the byte position
+    pub fn update_cursor(&mut self) {
+        for (i, win) in self.linestarts.windows(2).enumerate() {
+            if win[1] > self.position {
+                self.cursor.y = i;
+                self.cursor.x = str_column_length(self.current_line_str_before_cursor());
+                return;
+            }
+        }
+        // especial last line handling
+        self.cursor.y = self.linestarts.len() - 2;
+        self.cursor.x = str_column_length(self.current_line_str_before_cursor());
+    }
+
+
+    /// current line start and end using only self.cursor.y
+    pub fn current_line(&self) -> (usize, usize) {
+        return (self.linestarts[self.cursor.y], self.linestarts[self.cursor.y+1]);
+    }
+
+    /// length of current line in bytes
+    pub fn current_line_length(&self) -> usize {
+        let (start, end) = self.current_line();
+        end - start
+    }
+
+    /// length of current line in grapheme clusters
+    pub fn current_line_grapheme_count(&self) -> usize {
+        self.current_line_str().graphemes(true).count()
+    }
+
+    /// length of current line in grapheme clusters excluding linebreak
+    // pub fn current_line_grapheme_length_no_lb(&self) -> usize {
+    //     let str = self.current_line_str();
+    //     if str.graph
+    // }
+
+    pub fn current_line_str(&self) -> &str {
+        &self.content[self.linestarts[self.cursor.y]..self.linestarts[self.cursor.y+1]]
+    }
+
+    /// this one use self.position, so do not use it to calculate the position (please)
+    pub fn current_line_str_before_cursor(&self) -> &str {
+        &self.content[self.linestarts[self.cursor.y]..self.position]
+    }
+
+    pub fn is_first_line(&self) -> bool {
+        self.cursor.y == 0
+    }
+
+    pub fn is_last_line(&self) -> bool {
+        self.cursor.y + 2 == self.linestarts.len()
+    }
+
+    pub fn is_end_of_line(&self) -> bool {
+        let line_len = self.current_line_grapheme_count();
+        debug!("ll {}", line_len);
+        debug!("isll{}", self.is_last_line());
+        if self.is_last_line() && !self.whitespace_terminated() {
+            self.cursor.x == line_len
+        } else {
+            self.cursor.x == line_len.saturating_sub(1)
+        }
+    }
+
+    pub fn whitespace_terminated(&self) -> bool {
+        if let Some(c) = self.content.chars().rev().next() {
+            c.is_whitespace()
+        } else {
+            false
+        }
+    }
+    
     pub fn empty() -> Self {
         return Self {
             name: "".to_string(),
             content: String::new(),
             file: None,
             position: 0,
+            cursor: Cursor { x: 0, y: 0 },
+            linestarts: vec![0],
             readonly: false,
             opened_readonly: false,
             top: 0,
@@ -84,90 +233,138 @@ impl Buffer {
 
     /// Set the position into the buffer based on a location on the viewport
     pub fn set_viewport_cursor_pos(&mut self, x: u16, y: u16) {
-        let mut newlineiter = self.content.chars().enumerate().filter_map(|(i, c)| if c == '\n' || i == 0 {Some(i)} else {None}).skip(self.top + y as usize);
-        let mut linestart = newlineiter.next().unwrap_or(0);
-        if linestart == 0 { linestart = 0 } else { linestart += 1 };
-        self.position = cmp::min(cmp::min(linestart + x as usize, newlineiter.next().unwrap_or(usize::MAX)), self.content.len());
+        self.cursor.y = self.top + y as usize;
         self.prefered_col = Some(x as usize);
+        self.place_cursor_x(x as usize);
+        self.update_position();
     }
 
     /// Get position as column and row (of the total buffer not the viewport)
-    pub fn cursor_pos(&self) -> (u16, u16) {
-        let mut row = 0;
-        let mut col = 0;
-        for (index, chr) in self.content.chars().enumerate() {
-            if index >= self.position {
-                break;
-            }
-            if chr == '\t' {
-                col += crate::parse::whitespace::TABSIZE as u16;
-            } else {
-                col += 1;
-            }
-            if chr == '\n' {
-                row += 1;
-                col = 0;
-            }
+    // pub fn cursor_pos(&self) -> (u16, u16) {
+    //     let mut row = 0;
+    //     let mut col = 0;
+    //     for (index, chr) in self.content.chars().enumerate() {
+    //         if index >= self.position {
+    //             break;
+    //         }
+    //         if chr == '\t' {
+    //             col += crate::parse::whitespace::TABSIZE as u16;
+    //         } else {
+    //             col += 1;
+    //         }
+    //         if chr == '\n' {
+    //             row += 1;
+    //             col = 0;
+    //         }
+    //     }
+    //     return (col, row)
+    // }
+
+    /// return the previous grapheme string and boundary
+    pub fn prev_grapheme(&self) -> Option<(&str, usize)> {
+        let begin_prev_line = self.linestarts[self.cursor.y.saturating_sub(1)];
+        let str = &self.content[begin_prev_line..self.position];
+        let mut gcursor = GraphemeCursor::new(self.position, self.content.len(), true);
+        match gcursor.prev_boundary(str, begin_prev_line).log() {
+            Ok(Some(pb)) => {
+                Some((&self.content[pb..self.position], pb))
+            },
+            Ok(None) | Err(_) => None,
         }
-        return (col, row)
     }
 
+    pub fn cur_grapheme(&self) -> Option<&str> {
+        let str = &self.content[
+            self.position..
+            self.linestarts[cmp::min(self.cursor.y + 2, self.linestarts.len() - 1)]
+        ];
+        let mut gcursor = GraphemeCursor::new(self.position, self.content.len(), true);
+        match gcursor.next_boundary(str, self.position).log() {
+            Ok(Some(pb)) => {
+                Some(&self.content[self.position..pb])
+            },
+            Ok(None) | Err(_) => None,
+        }
+    }
+    /// move left to previous grapheme cluster
     pub fn move_left(&mut self) {
-        self.prefered_col = None;
-        self.position = self.position.saturating_sub(1);
+        if let Some((_s, i)) = self.prev_grapheme() {
+            self.position = i;
+            self.prefered_col = None;
+            self.update_cursor();
+        }
     }
-    
-    pub fn move_right(&mut self) {
-        self.prefered_col = None;
-        self.position = cmp::min(self.position + 1, self.content.len());
-    }
-    
-    pub fn move_up(&mut self) {
-        let start_of_line = self.start_of_line();
-        let prefered_col = self.prefered_col.unwrap_or(self.position.saturating_sub(start_of_line));
 
-        if let Some(start_of_prev_line) = self.start_of_prev_line() {
-            let previous_line_length = start_of_line.saturating_sub(start_of_prev_line+1);
-            self.position = cmp::min(start_of_prev_line + prefered_col, start_of_prev_line + previous_line_length);
-            self.prefered_col = Some(prefered_col);
-        } else {
-            self.position = start_of_line;
+    /// move to next grapheme cluster
+    pub fn move_right(&mut self) {
+        if let Some(s) = self.cur_grapheme() {
+            self.position += s.len();
+            self.prefered_col = None;
+            self.update_cursor();
         }
     }
+
+    // OLD cursor based move_right behaviour
+    // /// move a column to the right
+    // pub fn move_right(&mut self) {
+    //     if !self.is_end_of_line() {
+    //         self.prefered_col = None;
+    //         self.cursor.x += 1;
+    //         self.update_position();
+    //     } else if !self.is_last_line() {
+    //         self.prefered_col = Some(0);
+    //         self.move_down();
+    //     } 
+    // }
     
+
+    /// place the x cursor anywhere on the line,
+    /// assuming cursor.y is set this will move it to position or eol
+    /// and handle the preferred_col
+    pub fn place_cursor_x(&mut self, x: usize) {
+        let line_length = str_column_length(self.current_line_str());
+        self.prefered_col = Some(self.prefered_col.unwrap_or(x));
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+    }
+
+    /// move up a row
+    pub fn move_up(&mut self) {
+        if self.is_first_line() { self.goto_start_of_line(); return }
+        self.cursor.y = self.cursor.y.saturating_sub(1);
+        self.place_cursor_x(self.cursor.x);
+        self.update_position();
+    }
+
+    /// move down a row
     pub fn move_down(&mut self) {
-        let prefered_col = self.prefered_col.unwrap_or(self.position.saturating_sub(self.start_of_line()));
-        if let Some(start_of_next_line) = self.start_of_next_line() {
-            self.position = start_of_next_line;
-            let start_of_next_next_line = self.start_of_next_line().unwrap_or(self.content.len());
-            let next_line_length = start_of_next_next_line.saturating_sub(start_of_next_line + 1);
-            self.position = cmp::min(start_of_next_line + prefered_col, start_of_next_line + next_line_length);
-            self.prefered_col = Some(prefered_col);
-        } else {
-            self.position = self.content.len();
-        }
+        if self.is_last_line() { self.goto_end_of_line(); return }
+        self.cursor.y += 1;
+        self.place_cursor_x(self.cursor.x);
+        self.update_position();
     }
 
     pub fn page_up(&mut self, height: usize) {
-        let (col, mut row) = self.cursor_pos();
-        row = row.saturating_sub(self.top as u16);
         self.top = self.top.saturating_sub(height);
-        self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
+        self.cursor.y = self.cursor.y.saturating_sub(height);
+        self.place_cursor_x(self.cursor.x);
+        self.update_position();
     }
-    
+
     pub fn page_down(&mut self, height: usize) {
-        let (col, mut row) = self.cursor_pos();
-        row = row.saturating_sub(self.top as u16);
-        self.top = cmp::min(self.top + height - 1, self.content.lines().count().saturating_sub(height) + 1);
-        self.set_viewport_cursor_pos(self.prefered_col.unwrap_or(col as usize) as u16, row);
+        self.top = cmp::min(self.top + height, self.linestarts.len() - height);
+        self.cursor.y = cmp::min(self.cursor.y + height, self.linestarts.len() - 2);
+        self.place_cursor_x(self.cursor.x);
+        self.update_position();
     }
 
     pub fn to_top(&mut self) {
         self.position = 0;
+        self.update_cursor();
     }
 
     pub fn to_bottom(&mut self) {
         self.position = self.content.len()-1;
+        self.update_cursor();
     }
 
     fn start_of_next_line(&self) -> Option<usize> {
@@ -201,6 +398,7 @@ impl Buffer {
         return Some(0);
     }
 
+    // TODO rewrite to match new utilities
     pub fn move_word_left(&mut self) {
         let mut next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
         if next.is_whitespace() {
@@ -220,8 +418,10 @@ impl Buffer {
             }
         }
         self.prefered_col = None;
+        self.update_cursor();
     }
 
+    // TODO rewrite to match new utilities
     pub fn move_word_right(&mut self) {
         if self.current_char().is_whitespace() {
             while self.current_char().is_whitespace() && self.position+1 != self.content.len() && self.current_char() != '\n' {
@@ -237,19 +437,20 @@ impl Buffer {
             }
         }
         self.prefered_col = None;
+        self.update_cursor();;
     }
 
     pub fn goto_start_of_line(&mut self) {
-        self.position = self.start_of_line();
+        self.cursor.x = 0;
         self.prefered_col = None;
+        self.update_position();
     }
 
     pub fn goto_end_of_line(&mut self) {
-        self.position = match self.start_of_next_line() {
-            Some(start_of_next_line) => start_of_next_line - 1,
-            None => self.content.len(),
-        };
+        debug!("GOTO");
+        self.cursor.x = str_column_length(self.current_line_str());
         self.prefered_col = None;
+        self.update_position();
     }
 
     fn current_char(&self) -> char {
@@ -258,10 +459,12 @@ impl Buffer {
 
     pub fn insert(&mut self, chr: char) {
         if !self.readonly {
-            self.content.insert(self.position + self.magic_unicode_offset_bug_fix(), chr);
-            self.move_right();
-            // invalidating from top is faster than figuring out the current line
-            // and you render from the top anyway
+            self.content.insert(self.position, chr);
+            self.position += 1;
+            // TODO do not blindly generate linestarts
+            self.linestarts = generate_linestarts(&self.content);
+            self.update_cursor();
+            // TODO can I invalidate from the current line instead?
             self.parse_cache.invalidate_from(self.top);
         }
     }
@@ -361,7 +564,42 @@ impl Buffer {
             self.prefered_col = None;
             self.content.insert_str(self.position, content);
             self.position += content.len();
+            self.linestarts = generate_linestarts(&self.content);
         }
     }
 
+}
+
+#[test]
+fn snowman() {
+    let mut buf = Buffer::empty();
+    buf.paste("here is ☃ snowman");
+    //println!("{:?}", generate_newlines(&buf.content));
+    buf.position = 0;
+    for _ in 0..12 {
+        buf.move_right();
+    }
+    assert!(buf.position == 12 + String::from("☃").len() - 1);
+}
+
+#[test]
+fn linestarts() {
+    let mut buf = Buffer::empty();
+    buf.paste(
+"123
+123
+");
+    println!("{:?}", buf.linestarts);
+    assert!(buf.linestarts == vec![0,4,8]);
+}
+
+#[test]
+fn linestarts_snowman() {
+    let mut buf = Buffer::empty();
+    buf.paste(
+"1☃3
+123
+");
+    println!("{:?}", buf.linestarts);
+    assert!(buf.linestarts == vec![0,6,10]);
 }

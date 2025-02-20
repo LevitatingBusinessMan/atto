@@ -3,6 +3,7 @@ use dirs;
 
 use tracing::{info, level_filters::LevelFilter, Level};
 use tracing_subscriber::{fmt::{format::FmtSpan, writer::MakeWriterExt}, layer::SubscriberExt, Layer, Registry};
+use unicode_segmentation::GraphemeIncomplete;
 
 pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
     let file = fs::File::options()
@@ -36,6 +37,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
     Ok(())
 }
 
+/// Trait for logging different kinds of errors
 pub trait LogError {
     /// If this result is an error, log it as such
     fn log(self) -> Self;
@@ -51,6 +53,15 @@ impl<T> LogError for io::Result<T> {
 }
 
 impl<T> LogError for anyhow::Result<T> {
+    fn log(self) -> Self {
+        if let Err(err) = &self {
+            tracing::error!("{err:?}");
+        }
+        self
+    }
+}
+
+impl<T> LogError for core::result::Result<T, GraphemeIncomplete> {
     fn log(self) -> Self {
         if let Err(err) = &self {
             tracing::error!("{err:?}");
