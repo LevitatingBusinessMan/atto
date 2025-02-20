@@ -255,13 +255,12 @@ impl Buffer {
         if self.is_last_line() {
             return
         }
-        self.cursor.y += 1;
-        let mut line_length = self.current_line_grapheme_length();
-        if self.is_last_line() && !self.whitespace_terminated() {
-            line_length += 1;
-        }
         if self.prefered_col.is_none() { self.prefered_col = Some(self.cursor.x); }
-        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+        self.cursor.y += 1;
+        self.cursor.x = 0;
+        let line_length = self.current_line_grapheme_length();
+        if self.is_last_line() { return }
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length - 1);
         self.update_position();
     }
 
