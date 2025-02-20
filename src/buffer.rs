@@ -90,14 +90,9 @@ impl Buffer {
     /// update byte position based on the cursor,
     /// assumes the cursor is valid
     pub fn update_position(&mut self) {
-        debug!("cc {:?}", self.cursor);
-        debug!("newlines {:?}", self.linestarts);
-        debug!("{:?}", self.content);
         let (start, end) = self.current_line();
-        debug!("cl {} {} ", start, end);
         let offset = self.content[start..end].grapheme_indices(true).nth(self.cursor.x).unwrap_or_else(|| (self.current_line_grapheme_length(), "")).0;
         self.position = start + offset;
-        debug!("offset and pos {} {}", offset, self.position);
     }
 
     /// update cursor based on the byte position
@@ -245,12 +240,12 @@ impl Buffer {
             return
         }
         self.cursor.y += 1;
-        let prefered_col = self.prefered_col.unwrap_or(self.cursor.x);
         let mut line_length = self.current_line_grapheme_length();
         if self.is_last_line() && !self.whitespace_terminated() {
             line_length += 1;
         }
-        self.cursor.x = cmp::min(prefered_col, line_length);
+        if self.prefered_col.is_none() { self.prefered_col = Some(self.cursor.x); }
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length - 1);
         self.update_position();
     }
 

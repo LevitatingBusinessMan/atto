@@ -36,6 +36,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
     Ok(())
 }
 
+/// Trait for logging different kinds of errors
 pub trait LogError {
     /// If this result is an error, log it as such
     fn log(self) -> Self;
