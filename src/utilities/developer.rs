@@ -26,14 +26,7 @@ impl super::Utility for DeveloperModel {
                         , Style::new().bg(Color::Red)
                     )),
                     'z' => {
-                        crossterm::execute!(stdout(), crossterm::terminal::Clear(crossterm::terminal::ClearType::All)).unwrap();
-                        crate::tui::restore().unwrap();
-
-                        // send SIGSTOP to ourselves
-                        nix::sys::signal::kill(Pid::from_raw(0), nix::sys::signal::Signal::SIGSTOP).unwrap();
-
-                        crate::tui::setup().unwrap();
-                        crate::TERMINAL.get().unwrap().lock().unwrap().clear().unwrap();
+                        crate::suspend::suspend().unwrap();
                         Some(Message::CloseUtility)
                     }
                     _ => None

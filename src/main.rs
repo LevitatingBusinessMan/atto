@@ -21,6 +21,7 @@ mod syntect_tui;
 mod notification;
 mod utilities;
 mod wrap;
+mod suspend;
 
 use logging::{setup_logging, LogError};
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};

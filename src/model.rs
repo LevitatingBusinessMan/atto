@@ -4,7 +4,7 @@ use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}, Terminal};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error};
 
-use crate::{buffer::{self, Buffer}, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
+use crate::{buffer::{self, Buffer}, logging::LogError, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
 use crate::parse::ParseCache;
 use crate::notification::Notification;
 
@@ -236,6 +236,17 @@ impl Model {
                 self.current_buffer_mut().insert('\t');
                 self.may_scroll = true;
             },
+            Message::Suspend => match crate::suspend::suspend().log() {
+                Ok(_) => {},
+                Err(e) => {
+                    let _ = crate::tui::setup();
+                    let _ = crate::TERMINAL.get().unwrap().lock().unwrap().clear();
+                    return Some(Message::Notification(
+                        format!("Suspendin failed with {:?}", e),
+                        Style::new().bg(Color::Red).fg(Color::White)
+                    ))
+                },
+            }
         }
         None
     }
@@ -298,4 +309,5 @@ pub enum Message {
     ToTop,
     ToBottom,
     Tab,
+    Suspend,
 }

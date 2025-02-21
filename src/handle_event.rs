@@ -116,6 +116,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Char('h') => Some(Message::OpenHelp),
                 KeyCode::Char('f') => Some(Message::OpenFind),
                 KeyCode::Char('b') => Some(Message::OpenShell),
+                KeyCode::Char('z') => Some(Message::Suspend),
                 _ => None,
             }
         } else {
