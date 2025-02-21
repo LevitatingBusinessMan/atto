@@ -57,6 +57,8 @@ pub struct Cursor {
 }
 
 /// how much columns to use for this grapheme cluster
+/// TODO should I really consider newlines not to take a column?
+/// considering they can be rendered with a column
 pub fn grapheme_width(gr: &str) -> usize {
     if gr.chars().any(|c| c == '\t') {
         crate::parse::whitespace::TABSIZE
@@ -69,6 +71,12 @@ pub fn grapheme_width(gr: &str) -> usize {
 /// so grapheme clusters plus tab slots
 pub fn str_column_length(s: &str) -> usize {
     s.graphemes(true).fold(0, |a,gr| a + grapheme_width(gr))
+}
+
+/// like [str_column_length] but it strips the newline at the end
+pub fn str_column_length_no_lb(s: &str) -> usize {
+    s.trim_end_matches(|c| c == '\r'|| c == '\n')
+        .graphemes(true).fold(0, |a,gr| a + grapheme_width(gr))
 }
 
 impl Buffer {
@@ -185,25 +193,6 @@ impl Buffer {
     pub fn is_last_line(&self) -> bool {
         self.cursor.y + 2 == self.linestarts.len()
     }
-
-    pub fn is_end_of_line(&self) -> bool {
-        let line_len = self.current_line_grapheme_count();
-        debug!("ll {}", line_len);
-        debug!("isll{}", self.is_last_line());
-        if self.is_last_line() && !self.whitespace_terminated() {
-            self.cursor.x == line_len
-        } else {
-            self.cursor.x == line_len.saturating_sub(1)
-        }
-    }
-
-    pub fn whitespace_terminated(&self) -> bool {
-        if let Some(c) = self.content.chars().rev().next() {
-            c.is_whitespace()
-        } else {
-            false
-        }
-    }
     
     pub fn empty() -> Self {
         return Self {
@@ -233,7 +222,7 @@ impl Buffer {
 
     /// Set the position into the buffer based on a location on the viewport
     pub fn set_viewport_cursor_pos(&mut self, x: u16, y: u16) {
-        self.cursor.y = self.top + y as usize;
+        self.cursor.y = cmp::min(self.top + y as usize, self.linestarts.len() - 2);
         self.prefered_col = Some(x as usize);
         self.place_cursor_x(x as usize);
         self.update_position();
@@ -260,7 +249,7 @@ impl Buffer {
     //     return (col, row)
     // }
 
-    /// return the previous grapheme string and boundary
+    /// return the previous grapheme string and its left boundary
     pub fn prev_grapheme(&self) -> Option<(&str, usize)> {
         let begin_prev_line = self.linestarts[self.cursor.y.saturating_sub(1)];
         let str = &self.content[begin_prev_line..self.position];
@@ -273,7 +262,9 @@ impl Buffer {
         }
     }
 
-    pub fn cur_grapheme(&self) -> Option<&str> {
+    /// return the previous grapheme string and its right boundary
+    pub fn cur_grapheme(&self) -> Option<(&str, usize)> {
+        debug!("asdfsadfasd {} {}", self.position, self.cursor.y);
         let str = &self.content[
             self.position..
             self.linestarts[cmp::min(self.cursor.y + 2, self.linestarts.len() - 1)]
@@ -281,7 +272,7 @@ impl Buffer {
         let mut gcursor = GraphemeCursor::new(self.position, self.content.len(), true);
         match gcursor.next_boundary(str, self.position).log() {
             Ok(Some(pb)) => {
-                Some(&self.content[self.position..pb])
+                Some((&self.content[self.position..pb], pb))
             },
             Ok(None) | Err(_) => None,
         }
@@ -297,8 +288,8 @@ impl Buffer {
 
     /// move to next grapheme cluster
     pub fn move_right(&mut self) {
-        if let Some(s) = self.cur_grapheme() {
-            self.position += s.len();
+        if let Some((_s, b)) = self.cur_grapheme() {
+            self.position = b;
             self.prefered_col = None;
             self.update_cursor();
         }
@@ -322,9 +313,9 @@ impl Buffer {
     /// assuming cursor.y is set this will move it to position or eol
     /// and handle the preferred_col
     pub fn place_cursor_x(&mut self, x: usize) {
-        let line_length = str_column_length(self.current_line_str());
+        let line_length = str_column_length_no_lb(self.current_line_str());
         self.prefered_col = Some(self.prefered_col.unwrap_or(x));
-        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length.saturating_sub(1));
+        self.cursor.x = cmp::min(self.prefered_col.unwrap(), line_length);
     }
 
     /// move up a row
@@ -447,26 +438,13 @@ impl Buffer {
     }
 
     pub fn goto_end_of_line(&mut self) {
-        debug!("GOTO");
-        self.cursor.x = str_column_length(self.current_line_str());
+        self.cursor.x = str_column_length_no_lb(self.current_line_str());
         self.prefered_col = None;
         self.update_position();
     }
 
     fn current_char(&self) -> char {
         return self.content.chars().nth(self.position).unwrap();
-    }
-
-    pub fn insert(&mut self, chr: char) {
-        if !self.readonly {
-            self.content.insert(self.position, chr);
-            self.position += 1;
-            // TODO do not blindly generate linestarts
-            self.linestarts = generate_linestarts(&self.content);
-            self.update_cursor();
-            // TODO can I invalidate from the current line instead?
-            self.parse_cache.invalidate_from(self.top);
-        }
     }
 
     pub fn find(&mut self, query: String) {
@@ -559,12 +537,40 @@ impl Buffer {
         }
     }
 
+    // read only should be handled in model
+
+    pub fn insert(&mut self, chr: char) {
+        self.content.insert(self.position, chr);
+        self.position += 1;
+        // TODO do not blindly generate linestarts
+        self.linestarts = generate_linestarts(&self.content);
+        self.update_cursor();
+        // TODO can I invalidate from the current line instead?
+        self.parse_cache.invalidate_from(self.top);
+    }
+
     pub fn paste(&mut self, content: &str) {
-        if !self.readonly {
+        self.prefered_col = None;
+        self.content.insert_str(self.position, content);
+        self.position += content.len();
+        self.linestarts = generate_linestarts(&self.content);
+    }
+
+    pub fn backspace(&mut self) {
+        if let Some((s, b)) = self.prev_grapheme() {
+            self.content.drain(b..self.position);
+            self.position = b;
             self.prefered_col = None;
-            self.content.insert_str(self.position, content);
-            self.position += content.len();
             self.linestarts = generate_linestarts(&self.content);
+            self.update_cursor();
+        }
+    }
+
+    pub fn delete(&mut self) {
+        if let Some((_s, b)) = self.cur_grapheme() {
+            self.content.drain(self.position..b);
+            self.linestarts = generate_linestarts(&self.content);
+            self.update_cursor();
         }
     }
 

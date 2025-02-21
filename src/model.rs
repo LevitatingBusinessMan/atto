@@ -112,11 +112,11 @@ impl Model {
                 }
             },
             Message::ScrollDown => {
-                if (self.current_buffer().content.lines().count() - self.viewport.height as usize) > self.current_buffer_mut().top {
-                 self.current_buffer_mut().top += 1;
+                if (self.current_buffer().content.lines().count() + 1 - self.viewport.height as usize) > self.current_buffer_mut().top {
+                    self.current_buffer_mut().top += 2;
                 }
             },
-            Message::ScrollUp => self.current_buffer_mut().top = self.current_buffer_mut().top.checked_sub(1).unwrap_or_default(),
+            Message::ScrollUp => self.current_buffer_mut().top = self.current_buffer_mut().top.saturating_sub(2),
             Message::OpenHelp => self.utility = Some(UtilityWindow::Help(utilities::help::HelpModel())),
             Message::OpenFind => self.utility = Some(UtilityWindow::Find(utilities::find::FindModel::new())),
             Message::Escape => return Some(Message::CloseUtility),
@@ -151,19 +151,8 @@ impl Model {
                 self.current_buffer_mut().page_down(height);
                 // self.may_scroll = true;
             },
-            Message::Backspace => {
-                let cur = self.current_buffer_mut();
-                if cur.position > 0 {
-                    cur.content.remove(cur.position-1);
-                    return Some(Message::MoveLeft);
-                }
-            },
-            Message::Delete => {
-                let cur = self.current_buffer_mut();
-                if cur.position < cur.content.len() {
-                    cur.content.remove(cur.position);
-                }
-            },
+            Message::Backspace => self.current_buffer_mut().backspace(),
+            Message::Delete => self.current_buffer_mut().delete(),
             Message::JumpWordLeft => {
                 self.current_buffer_mut().move_word_left();
                 self.may_scroll = true;
