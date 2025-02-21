@@ -34,10 +34,10 @@ impl ShellModel {
         };
 
         let mut terminal = crate::TERMINAL.get().unwrap().lock().unwrap();
+        crate::tui::restore()?;
         terminal.clear()?;
         terminal.set_cursor_position((0,0))?;
-        crate::tui::restore()?;
-        
+
         let mut child = cmd.arg(&self.entry)
             .stdin(Stdio::inherit())
             .stdout(Stdio::piped())
