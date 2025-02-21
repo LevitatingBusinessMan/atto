@@ -25,8 +25,7 @@ impl View for Model {
                 .constraints([Constraint::Min(0), Constraint::Length(1)])
                 .split(f.area());
 
-        let large_file = self.current_buffer().content.len() > LARGE_FILE_LIMIT;
-        let content_height = if large_file { usize::MAX } else { self.current_buffer().content.chars().filter(|c| *c == '\n').count() };
+        let content_height = self.current_buffer().linestarts.len() - 1;
         let scrollbar_width = if content_height as u16 > f.area().height {1} else {0};
 
         let buffer_and_scrollbar = Layout::default()
@@ -86,11 +85,9 @@ impl View for Model {
         }
 
         let scrollbar = Scrollbar::default();
-            let mut scrollbar_state = if large_file { ScrollbarState::new(1) } else {
-            ScrollbarState::new(content_height.saturating_sub(f.area().height as usize))
-            .position(self.current_buffer().top)
-        };
-        
+        let mut scrollbar_state = ScrollbarState::new(content_height.saturating_sub(f.area().height as usize))
+            .position(self.current_buffer().top);
+
         if scrollbar_width > 0 {
             f.render_stateful_widget(
                 scrollbar,
