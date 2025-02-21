@@ -251,7 +251,7 @@ impl Buffer {
 
     /// return the previous grapheme string and its left boundary
     pub fn prev_grapheme(&self) -> Option<(&str, usize)> {
-        let begin_prev_line = self.linestarts[self.cursor.y.saturating_sub(1)];
+        let begin_prev_line = self.linestarts[self.cursor.y.saturating_sub(2)];
         let str = &self.content[begin_prev_line..self.position];
         let mut gcursor = GraphemeCursor::new(self.position, self.content.len(), true);
         match gcursor.prev_boundary(str, begin_prev_line).log() {
