@@ -4,6 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 use color_eyre::owo_colors::OwoColorize;
 use ratatui::{layout::{Alignment, Constraint, Direction, Layout}, style::{Style, Stylize}, text::{Line, Text}, widgets::{Clear, Paragraph, Scrollbar, ScrollbarState}, Frame};
 use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
+use tracing::debug;
 
 use crate::{model::Model, parse::{parse_from, ParseCache}, utilities::{Utility}};
 use crate::buffer::Buffer;
@@ -150,8 +151,9 @@ impl View for Model {
             } else {
                 f.render_widget(Clear, area);
             }
-            let widget = Text::raw(wrapped_content)
+            let widget = Paragraph::new(wrapped_content)
                 .style(notification.style)
+                .scroll((height.saturating_sub(area.height as usize) as u16,0))
                 .alignment(alignment);
             f.render_widget(widget, area);
         }
