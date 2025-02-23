@@ -503,7 +503,7 @@ impl Buffer {
 
     #[tracing::instrument(skip(self), level="debug")]
     pub fn save_as_root(&mut self) -> io::Result<()> {
-        let (reader, mut writer) = std::pipe::pipe()?;
+        let (reader, mut writer) = io::pipe()?;
         let mut dd = process::Command::new(PRIVESC_CMD)
             .args(vec!["dd", "bs=4k", &format!("of={}", self.name)])
             .stdin(reader)
