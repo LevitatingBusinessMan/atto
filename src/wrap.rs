@@ -20,8 +20,6 @@ pub fn get_linebreak_locations(line: &str, width: usize) -> Vec<usize> {
 fn first_lb() {
     let line = "12345 67890
 1234567 890";
-    println!("lbr {:?}", linebreaks(line).collect::<Vec<(usize, unicode_linebreak::BreakOpportunity)>>());
-
-    println!("lb {:?}", get_linebreak_locations(line, 3));
-    //assert!(get_linebreak_locations(line, 5) == vec![5]);
+    //println!("lbr {:?}", linebreaks(line).collect::<Vec<(usize, unicode_linebreak::BreakOpportunity)>>());
+    assert!(get_linebreak_locations(line, 3) == vec![6, 12 ,20]);
 }

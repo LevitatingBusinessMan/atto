@@ -580,12 +580,20 @@ impl Buffer {
 fn snowman() {
     let mut buf = Buffer::empty();
     buf.paste("here is ☃ snowman");
-    //println!("{:?}", generate_newlines(&buf.content));
     buf.position = 0;
     for _ in 0..12 {
         buf.move_right();
     }
     assert!(buf.position == 12 + String::from("☃").len() - 1);
+}
+
+#[test]
+fn step_over_y() {
+    let mut buf = Buffer::empty();
+    let y = "y̆";
+    buf.paste(y);
+    buf.move_right();
+    assert!(buf.position == 3);
 }
 
 #[test]
@@ -596,7 +604,7 @@ fn linestarts() {
 123
 ");
     println!("{:?}", buf.linestarts);
-    assert!(buf.linestarts == vec![0,4,8]);
+    assert!(buf.linestarts == vec![0,4,8,8]);
 }
 
 #[test]
@@ -607,5 +615,14 @@ fn linestarts_snowman() {
 123
 ");
     println!("{:?}", buf.linestarts);
-    assert!(buf.linestarts == vec![0,6,10]);
+    assert!(buf.linestarts == vec![0,6,10,10]);
+}
+
+#[test]
+fn linestarts_no_lb() {
+    let mut buf = Buffer::empty();
+    buf.paste(
+"123");
+    println!("{:?}", buf.linestarts);
+    assert!(buf.linestarts == vec![0,3]);
 }
