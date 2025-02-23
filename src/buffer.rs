@@ -2,6 +2,7 @@ use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Wr
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{debug, info};
 use unicode_segmentation::{GraphemeCursor, GraphemeIndices, UnicodeSegmentation};
+use unicode_width::UnicodeWidthStr;
 
 
 use crate::{logging::LogError, parse::*};
@@ -63,7 +64,7 @@ pub fn grapheme_width(gr: &str) -> usize {
     if gr.chars().any(|c| c == '\t') {
         crate::parse::whitespace::TABSIZE
     } else {
-        1
+        gr.width()
     }
 }
 
