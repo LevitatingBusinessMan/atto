@@ -71,7 +71,7 @@ pub struct Cursor {
 /// the amount of columsn a str will take,
 /// so grapheme clusters plus tab slots
 pub fn str_column_length(s: &str) -> usize {
-    perform_str_replacements(s, crate::ARGS.get().unwrap().whitespace).width()
+    perform_str_replacements(s, false).width()
 }
 
 /// like [str_column_length] but it strips the newline at the end

@@ -5,7 +5,7 @@
 #![feature(panic_payload_as_str)]
 #![feature(anonymous_pipe)]
 #![feature(read_buf)]
-use std::{fs::{self, File}, io::{self, Error, Stdout}, iter::Once, path::PathBuf, rc::Rc, sync::{Mutex, OnceLock}};
+use std::{fs::{self, File}, io::{self, Error, Stdout}, iter::Once, path::PathBuf, rc::Rc, sync::{LazyLock, Mutex, OnceLock}};
 
 use clap::{crate_version, Arg, Parser};
 use anyhow;
@@ -35,7 +35,6 @@ use buffer::Buffer;
 compile_error!("feature \"onig\" and feature \"fancy_regex\" cannot be enabled at the same time");
 
 static TERMINAL: OnceLock<Mutex<Terminal<CrosstermBackend<Stdout>>>> = OnceLock::new();
-static ARGS: OnceLock<Args> = OnceLock::new();
 
 static HELP_TEMPLATE: &'static str = "\
 {usage-heading} {usage}
@@ -78,8 +77,6 @@ fn main() -> anyhow::Result<()> {
     model.show_whitespace = args.whitespace;
 
     let mut event_state = handle_event::EventState::default();
-
-    ARGS.set(args).unwrap();
 
     terminal.draw(|frame| model.view(frame))?;
     TERMINAL.set(Mutex::new(terminal)).unwrap();

@@ -18,9 +18,10 @@ const CACHE_FREQUENCY: usize = 10;
 pub mod whitespace {
     pub const TABSIZE: usize = 4;
     // https://www.emacswiki.org/emacs/ShowWhiteSpace
-    //const LF: char = '¶'; // pilcrow
+    pub const LF: &'static str = "¶\n"; // pilcrow
+    pub const CR: &'static str = "⁋";
     //static LF: &'static str = "\n$";
-    //const SPACE: char = '·';
+    pub const SPACE: &'static str = "·";
 }
 
 pub trait ParseCacheTrait {
@@ -48,6 +49,8 @@ impl ParseCacheTrait for ParseCache {
 /// Replace characters
 /// in the future this should be able to take non-utf8 and create utf8 strings
 /// for binary editing
+/// it is important that whitespace replacements don't change the length for now, because
+/// the whitespace setting isn't globally known
 pub fn perform_str_replacements<'a>(str: &'a str, decorate_whitespace: bool) -> Cow<'a, str> {
     let cow: Cow<'a, str> = Cow::Borrowed(&str);
     let toreplace = if decorate_whitespace {
@@ -59,9 +62,9 @@ pub fn perform_str_replacements<'a>(str: &'a str, decorate_whitespace: bool) -> 
         if decorate_whitespace {
             cow
             .replace("\t", &"↦".repeat(whitespace::TABSIZE))
-            .replace("\n", "¶\n")
-            .replace("\r", "⁋\n")
-            .replace(" ", "·").into()
+            .replace("\n", whitespace::LF)
+            .replace("\r", whitespace::CR)
+            .replace(" ", whitespace::SPACE).into()
         } else {
             cow
             .replace("\t", &" ".repeat(whitespace::TABSIZE)).into()
