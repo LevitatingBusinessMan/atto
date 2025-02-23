@@ -5,9 +5,9 @@
 #![feature(panic_payload_as_str)]
 #![feature(anonymous_pipe)]
 #![feature(read_buf)]
-use std::{fs::{self, File}, io::{self, Error, Stdout}, path::PathBuf, rc::Rc, sync::{Mutex, OnceLock}};
+use std::{fs::{self, File}, io::{self, Error, Stdout}, iter::Once, path::PathBuf, rc::Rc, sync::{Mutex, OnceLock}};
 
-use clap::{Parser, crate_version};
+use clap::{crate_version, Arg, Parser};
 use anyhow;
 
 mod buffer;
@@ -35,6 +35,7 @@ use buffer::Buffer;
 compile_error!("feature \"onig\" and feature \"fancy_regex\" cannot be enabled at the same time");
 
 static TERMINAL: OnceLock<Mutex<Terminal<CrosstermBackend<Stdout>>>> = OnceLock::new();
+static ARGS: OnceLock<Args> = OnceLock::new();
 
 static HELP_TEMPLATE: &'static str = "\
 {usage-heading} {usage}
@@ -63,7 +64,7 @@ fn main() -> anyhow::Result<()> {
     let _ = setup_logging(&args);
     info!("Launched with {args:?}");
 
-    let buffers = match args.files {
+    let buffers = match &args.files {
         Some(files) => read_files(files),
         None => io::Result::Ok(vec![Buffer::empty()]),
     }.log()?;
@@ -77,6 +78,8 @@ fn main() -> anyhow::Result<()> {
     model.show_whitespace = args.whitespace;
 
     let mut event_state = handle_event::EventState::default();
+
+    ARGS.set(args).unwrap();
 
     terminal.draw(|frame| model.view(frame))?;
     TERMINAL.set(Mutex::new(terminal)).unwrap();
@@ -92,7 +95,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn read_files(paths: Vec<String>) -> io::Result<Vec<Buffer>> {
+fn read_files(paths: &Vec<String>) -> io::Result<Vec<Buffer>> {
     let mut buffers: Vec<Buffer> = Vec::with_capacity(paths.len());
     for path in paths.iter() {
         let (file, readonly) = match fs::File::options().create(true).read(true).write(true).open(path) {

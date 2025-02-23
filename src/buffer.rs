@@ -60,24 +60,23 @@ pub struct Cursor {
 /// how much columns to use for this grapheme cluster
 /// TODO should I really consider newlines not to take a column?
 /// considering they can be rendered with a column
-pub fn grapheme_width(gr: &str) -> usize {
-    if gr.chars().any(|c| c == '\t') {
-        crate::parse::whitespace::TABSIZE
-    } else {
-        gr.width()
-    }
-}
+// pub fn grapheme_width(gr: &str) -> usize {
+//     if gr.chars().any(|c| c == '\t') {
+//         crate::parse::whitespace::TABSIZE
+//     } else {
+//         gr.width()
+//     }
+// }
 
 /// the amount of columsn a str will take,
 /// so grapheme clusters plus tab slots
 pub fn str_column_length(s: &str) -> usize {
-    s.graphemes(true).fold(0, |a,gr| a + grapheme_width(gr))
+    perform_str_replacements(s, crate::ARGS.get().unwrap().whitespace).width()
 }
 
 /// like [str_column_length] but it strips the newline at the end
 pub fn str_column_length_no_lb(s: &str) -> usize {
-    s.trim_end_matches(|c| c == '\r'|| c == '\n')
-        .graphemes(true).fold(0, |a,gr| a + grapheme_width(gr))
+    str_column_length(s.trim_end_matches(|c| c == '\r'|| c == '\n'))
 }
 
 impl Buffer {
@@ -153,7 +152,7 @@ impl Buffer {
                 self.cursor.x = col;
                 break;
             }
-            col += grapheme_width(gr);
+            col += str_column_length(gr);
             pos += gr.len();
         }
         self.position = self.linestarts[self.cursor.y] + pos;

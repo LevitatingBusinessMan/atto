@@ -1,5 +1,6 @@
 //! For all your parsing and highlighting needs
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use ratatui::style::Stylize;
@@ -44,6 +45,32 @@ impl ParseCacheTrait for ParseCache {
     }
 }
 
+/// Replace characters
+/// in the future this should be able to take non-utf8 and create utf8 strings
+/// for binary editing
+pub fn perform_str_replacements<'a>(str: &'a str, decorate_whitespace: bool) -> Cow<'a, str> {
+    let cow: Cow<'a, str> = Cow::Borrowed(&str);
+    let toreplace = if decorate_whitespace {
+        vec!['\t', '\n', '\r', ' ']
+    } else {
+        vec!['\t']
+    };
+    if str.chars().any(|c| toreplace.contains(&c)) {
+        if decorate_whitespace {
+            cow
+            .replace("\t", &"↦".repeat(whitespace::TABSIZE))
+            .replace("\n", "¶\n")
+            .replace("\r", "⁋\n")
+            .replace(" ", "·").into()
+        } else {
+            cow
+            .replace("\t", &" ".repeat(whitespace::TABSIZE)).into()
+        }
+    } else {
+        cow
+    }
+}
+
 #[tracing::instrument(skip_all, level="trace", fields(start, limit = limit, from = from, n))]
 pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, cache: &mut HashMap<usize, CachedParseState>, highlighter: &Highlighter, syntax: &SyntaxReference, syntax_set: &SyntaxSet, show_whitespace: bool) 
 -> anyhow::Result<Vec<Line<'a>>> {
@@ -83,21 +110,8 @@ pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, ca
                 // not all parsers create separate spans for the whitespace
                 // I have to figure out a method to break up spans
                 // otherwise I cannot color the whitespace appropiately
-                match show_whitespace {
-                    true => {
-                        let content = s.content
-                        .replace("\t", &"↦".repeat(whitespace::TABSIZE))
-                        .replace("\n", "¶\n")
-                        .replace("\r", "⁋\n")
-                        .replace(" ", "·");
-                        s = s.content(content);
-                        //s = s.fg(ratatui::style::Color::DarkGray);
-                    },
-                    false => {
-                        let content = s.content.replace("\t", &" ".repeat(whitespace::TABSIZE));
-                        s = s.content(content);
-                    }
-                }
+                let content = perform_str_replacements(&s.content, show_whitespace).into_owned();
+                s = s.content(content);
                 if s.style.bg.is_none() {
                     s = s.fg(ratatui::style::Color::Reset);
                 }
