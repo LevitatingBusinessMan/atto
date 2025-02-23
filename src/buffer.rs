@@ -102,6 +102,24 @@ impl Buffer {
         }
     }
 
+    pub fn empty() -> Self {
+        return Self {
+            name: "empty".to_string(),
+            content: String::new(),
+            file: None,
+            position: 0,
+            cursor: Cursor { x: 0, y: 0 },
+            linestarts: vec![0],
+            readonly: false,
+            opened_readonly: false,
+            top: 0,
+            prefered_col: None,
+            parse_cache: HashMap::new(),
+            syntax: None,
+            highlights: vec![],
+        }
+    }
+
     pub fn increase_all_linestarts(&mut self, from: usize, n: usize) {
         self.linestarts.iter_mut().for_each(|ls| if from >= *ls { *ls = ls.saturating_add(n) });
     }
@@ -193,24 +211,6 @@ impl Buffer {
 
     pub fn is_last_line(&self) -> bool {
         self.cursor.y + 2 == self.linestarts.len()
-    }
-    
-    pub fn empty() -> Self {
-        return Self {
-            name: "".to_string(),
-            content: String::new(),
-            file: None,
-            position: 0,
-            cursor: Cursor { x: 0, y: 0 },
-            linestarts: vec![0],
-            readonly: false,
-            opened_readonly: false,
-            top: 0,
-            prefered_col: None,
-            parse_cache: HashMap::new(),
-            syntax: None,
-            highlights: vec![],
-        }
     }
 
     pub fn set_position(&mut self, pos: usize) {
@@ -586,8 +586,31 @@ fn step_over_y() {
     let mut buf = Buffer::empty();
     let y = "y̆";
     buf.paste(y);
+    buf.position = 0;
     buf.move_right();
     assert!(buf.position == 3);
+}
+
+#[test]
+fn step_over_flags() {
+    let mut buf = Buffer::empty();
+    let flags: &str = "🇷🇺🇸🇹";
+    buf.paste(flags);
+    buf.position = 0;
+    buf.move_right();
+    assert!(buf.position == 8);
+    assert!(buf.cursor.x == 2);
+}
+
+#[test]
+fn step_over_ghosts() {
+    let mut buf = Buffer::empty();
+    let ghosts: &str = "👻👻👻";
+    buf.paste(ghosts);
+    buf.position = 0;
+    buf.move_right();
+    assert!(buf.position == 4);
+    assert!(buf.cursor.x == 2);
 }
 
 #[test]
