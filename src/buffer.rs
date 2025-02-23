@@ -252,10 +252,8 @@ impl Buffer {
 
     /// return the previous grapheme string and its left boundary
     pub fn prev_grapheme(&self) -> Option<(&str, usize)> {
-        let begin_prev_line = self.linestarts[self.cursor.y.saturating_sub(2)];
-        let str = &self.content[begin_prev_line..self.position];
         let mut gcursor = GraphemeCursor::new(self.position, self.content.len(), true);
-        match gcursor.prev_boundary(str, begin_prev_line).log() {
+        match gcursor.prev_boundary(&self.content, 0).log() {
             Ok(Some(pb)) => {
                 Some((&self.content[pb..self.position], pb))
             },
@@ -265,13 +263,8 @@ impl Buffer {
 
     /// return the previous grapheme string and its right boundary
     pub fn cur_grapheme(&self) -> Option<(&str, usize)> {
-        debug!("asdfsadfasd {} {}", self.position, self.cursor.y);
-        let str = &self.content[
-            self.position..
-            self.linestarts[cmp::min(self.cursor.y + 2, self.linestarts.len() - 1)]
-        ];
         let mut gcursor = GraphemeCursor::new(self.position, self.content.len(), true);
-        match gcursor.next_boundary(str, self.position).log() {
+        match gcursor.next_boundary(&self.content, 0).log() {
             Ok(Some(pb)) => {
                 Some((&self.content[self.position..pb], pb))
             },
