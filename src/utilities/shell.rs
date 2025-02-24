@@ -1,4 +1,4 @@
-use std::{env, io::{self, stdout, BufRead, BufReader, Read, Stdout, Write}, os::fd::{AsRawFd, BorrowedFd}, process::{self, Command, Stdio}};
+use std::{cmp, env, io::{self, stdout, BufRead, BufReader, Read, Stdout, Write}, os::fd::{AsRawFd, BorrowedFd}, process::{self, Command, Stdio}, sync::Mutex};
 
 use crossterm::{event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags}, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}, ExecutableCommand, QueueableCommand};
 use nix::{libc::POLLIN, poll::{poll, PollFd, PollFlags, PollTimeout}, sys::{select::FdSet, time::TimeVal}};
@@ -11,15 +11,17 @@ use super::default_view;
 
 //static UNIX_SHELL: &'static str = "sh";
 static UNIX_SHELL: &'static str = "fish";
+static HISTORY: Mutex<Vec<String>> = Mutex::new(vec![]);
 
 #[derive(Debug)]
 pub struct ShellModel {
     pub entry: String,
+    pub history_i : usize,
 }
 
 impl ShellModel {
     pub fn new() -> Self {
-        Self { entry: String::new() }
+        Self { entry: String::new(), history_i: 0 }
     }
 
     #[tracing::instrument(skip_all, level="info", fields(cmd=self.entry))]
@@ -43,8 +45,6 @@ impl ShellModel {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn().log()?;
-
-        self.entry.clear();
 
         // we could potentially improve performance by using a bufreader
         let mut stdout_pipe = child.stdout.take().unwrap();
@@ -141,13 +141,37 @@ impl ShellModel {
 
 impl super::Utility for ShellModel {
     fn update(&mut self, msg: Message) -> Option<Message> {
+        let mut history = HISTORY.lock().unwrap();
         match &msg {
             Message::InsertChar(c) => self.entry.push(*c),
             Message::Paste(paste) => self.entry.push_str(paste),
             Message::Backspace => { self.entry.pop(); },
             Message::Enter => return match self.exec().log() {
-                Ok(m) => Some(m),
-                Err(e) => Some(Message::Notification(format!("{e:?}"), Style::new().bg(Color::Red)))
+                Ok(m) => {
+                    history.retain(|e| e != &self.entry);
+                    history.push(self.entry.clone());
+                    self.history_i = history.len();
+                    self.entry.clear();
+                    Some(m)
+                },
+                Err(e) => {
+                    self.entry.clear();
+                    Some(Message::Notification(format!("{e:?}"), Style::new().bg(Color::Red)))
+                }
+            },
+            Message::MoveUp => {
+                self.history_i = self.history_i.saturating_sub(1);
+                if let Some(e) = history.get(self.history_i) {
+                    self.entry = e.clone();
+                }
+            },
+            Message::MoveDown => {
+                self.history_i = cmp::min(self.history_i + 1, history.len());
+                if let Some(e) = history.get(self.history_i) {
+                    self.entry = e.clone();
+                } else {
+                    self.entry = String::new();
+                }
             },
             _ => return Some(msg),
         }
