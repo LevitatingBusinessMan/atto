@@ -1,4 +1,4 @@
-use std::{cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, sync::{Arc, Mutex}, usize};
+use std::{cell::RefCell, cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, rc::Rc, sync::{Arc, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{debug, info};
 use unicode_segmentation::{GraphemeCursor, GraphemeIndices, UnicodeSegmentation};
@@ -29,9 +29,10 @@ pub struct Buffer {
     /// Which column the cursor wants to be in (that's vague I know)
     pub prefered_col: Option<usize>,
     /// The cached parse states for this buffer
-    pub parse_cache: HashMap<usize, CachedParseState>,
+    pub parse_cache: Rc<RefCell<HashMap<usize, CachedParseState>>>,
     pub syntax: Option<SyntaxReference>,
     pub highlights: Vec<(usize, usize)>,
+    pub dirty: bool,
 }
 
 fn generate_linestarts(content: &str) -> Vec<usize> {
@@ -95,9 +96,10 @@ impl Buffer {
             opened_readonly: readonly,
             top: 0,
             prefered_col: None,
-            parse_cache: HashMap::new(),
+            parse_cache: Rc::new(RefCell::new(HashMap::new())),
             syntax: None,
             highlights: vec![],
+            dirty: false,
         }
     }
 
@@ -113,9 +115,10 @@ impl Buffer {
             opened_readonly: false,
             top: 0,
             prefered_col: None,
-            parse_cache: HashMap::new(),
+            parse_cache: Rc::new(RefCell::new(HashMap::new())),
             syntax: None,
             highlights: vec![],
+            dirty: true,
         }
     }
 
@@ -546,7 +549,7 @@ impl Buffer {
         self.linestarts = generate_linestarts(&self.content);
         self.update_cursor();
         // TODO can I invalidate from the current line instead?
-        self.parse_cache.invalidate_from(self.top);
+        self.parse_cache.borrow_mut().invalidate_from(self.top);
     }
 
     pub fn paste(&mut self, content: &str) {

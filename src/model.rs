@@ -21,7 +21,6 @@ pub struct Model {
     /// the buffer because the cursor might've moved 
     /// out of view; 
     pub may_scroll: bool,
-    pub parse_caches: HashMap<String, Rc<RefCell<ParseCache>>>,
     pub theme_set: ThemeSet,
     pub syntax_set: SyntaxSet,
     pub theme: String,
@@ -33,13 +32,13 @@ pub struct Model {
 
 impl Model {
     pub fn new<'a>(mut buffers: Vec<Buffer>, theme_set: ThemeSet, viewport: Size) -> Model {
-        let parse_caches = (|| {
-            let mut map = HashMap::new();
-            for buf in &buffers {
-                map.insert(buf.name.clone().unwrap_or("?".to_string()), Rc::new(RefCell::new(ParseCache::new())));
-            }
-            map
-        })();
+        // let parse_caches = (|| {
+        //     let mut map = HashMap::new();
+        //     for buf in &buffers {
+        //         map.insert(buf.name.clone().unwrap_or("?".to_string()), Rc::new(RefCell::new(ParseCache::new())));
+        //     }
+        //     map
+        // })();
 
         let syntax_set = SyntaxSet::load_defaults_newlines();
         for buffer in &mut buffers {
@@ -51,7 +50,6 @@ impl Model {
             running: true,
             utility: None,
             may_scroll: false,
-            parse_caches,
             theme_set,
             syntax_set,
             theme: "dracula".to_owned(),
@@ -246,6 +244,10 @@ impl Model {
                         Style::new().bg(Color::Red).fg(Color::White)
                     ))
                 },
+            },
+            Message::NewEmptyBuffer => {
+                self.buffers.push(Buffer::empty());
+                self.selected = self.buffers.len() - 1;
             }
         }
         None
@@ -310,4 +312,5 @@ pub enum Message {
     ToBottom,
     Tab,
     Suspend,
+    NewEmptyBuffer,
 }

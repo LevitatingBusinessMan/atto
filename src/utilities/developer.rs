@@ -15,7 +15,7 @@ impl super::Utility for DeveloperModel {
         match msg {
             Message::InsertChar(char) => {
                 match char {
-                    '\n' => Some(Message::Notification(indoc!{"
+                    'e' => Some(Message::Notification(indoc!{"
                         warning: unused variable: `width`
                         --> src/view.rs:139:21
                             |
@@ -28,7 +28,10 @@ impl super::Utility for DeveloperModel {
                     'z' => {
                         crate::suspend::suspend().unwrap();
                         Some(Message::CloseUtility)
-                    }
+                    },
+                    'n' => {
+                        Some(Message::NewEmptyBuffer)
+                    },
                     _ => None
                 }
             },
@@ -37,8 +40,9 @@ impl super::Utility for DeveloperModel {
     }
     fn view(&self, m: &crate::model::Model, f: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
         super::default_view("brrrrr", indoc! {"
-        * n - create an error notification
+        * e - create an error notification
         * z - experiemntal suspend option
+        * n - new buffer
         "}, f, area);
     }
 }

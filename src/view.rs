@@ -62,9 +62,7 @@ impl View for Model {
 
         let current_buffer = self.current_buffer();
 
-        let cache = self.parse_caches.get(&current_buffer.name.clone().unwrap_or("?".to_string())).unwrap().clone();
-
-        let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache, &self.syntax_set, self.theme(), self.show_whitespace) {
+        let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, &self.syntax_set, self.theme(), self.show_whitespace) {
             Ok(tokens) => Paragraph::new(tokens),
             Err(e) => {
                 tracing::error!("{:?}", e);
@@ -103,7 +101,8 @@ impl View for Model {
                     std::format!(
                         " {:<} {:>width$} ",
                         "Welcome to Atto! Ctrl-h for help",
-                        std::format!("({}/{}) at b{} {}{} {}/{}",
+                        std::format!("{} ({}/{}) at b{} {}{} {}/{}",
+                            self.current_buffer().syntax.clone().map_or("plain".to_string(), |s| s.name.to_lowercase()),
                             self.current_buffer().cursor.x + 1,
                             self.current_buffer().cursor.y + 1,
                             self.current_buffer().position,
@@ -161,9 +160,9 @@ impl View for Model {
 }
 
 /// Parse and highlight a buffer
-fn highlight<'a>(buffer: &'a Buffer, height: usize, cache: Rc<RefCell<ParseCache>>, syntax_set: &SyntaxSet, theme: &Theme, show_whitespace: bool) -> anyhow::Result<Vec<Line<'a>>> {
+fn highlight<'a>(buffer: &'a Buffer, height: usize, syntax_set: &SyntaxSet, theme: &Theme, show_whitespace: bool) -> anyhow::Result<Vec<Line<'a>>> {
     let lines = LinesWithEndings::from(&buffer.content);
     let hl = Highlighter::new(theme);
     let syntax = buffer.syntax.as_ref().unwrap_or(syntax_set.find_syntax_plain_text());
-    parse_from(buffer.top, lines, height, &mut cache.borrow_mut(), &hl, syntax, &syntax_set, show_whitespace)
+    parse_from(buffer.top, lines, height, &mut buffer.parse_cache.borrow_mut(), &hl, syntax, &syntax_set, show_whitespace)
 }
