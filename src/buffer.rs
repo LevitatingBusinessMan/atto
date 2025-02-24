@@ -11,7 +11,7 @@ pub static PRIVESC_CMD: &'static str = "run0";
 
 #[derive(Clone, Debug)]
 pub struct Buffer {
-    pub name: String,
+    pub name: Option<String>,
     pub content: String,
     pub file: Option<Arc<Mutex<File>>>,
 	/// cursors byte index into the buffer
@@ -85,7 +85,7 @@ impl Buffer {
         file.read_to_string(&mut content).unwrap();
         let linestarts = generate_linestarts(&content);
         return Self {
-            name,
+            name: Some(name),
             content: content,
             file: Some(Arc::new(Mutex::new(file))),
             position: 0,
@@ -103,12 +103,12 @@ impl Buffer {
 
     pub fn empty() -> Self {
         return Self {
-            name: "empty".to_string(),
+            name: None,
             content: String::new(),
             file: None,
             position: 0,
             cursor: Cursor { x: 0, y: 0 },
-            linestarts: vec![0],
+            linestarts: generate_linestarts(""),
             readonly: false,
             opened_readonly: false,
             top: 0,
@@ -455,7 +455,8 @@ impl Buffer {
 
     // Tries to find and set a syntax
     pub fn find_syntax<'a>(&mut self, syntax_set: &'a SyntaxSet) -> Option<&'a SyntaxReference> {
-        let extension = self.name.split('.').last().unwrap_or("");
+        let name = self.name.clone()?;
+        let extension = name.split('.').last().unwrap_or("");
         let syntax = match syntax_set.find_syntax_by_extension(extension) {
             Some(syntax) => Some(syntax),
             None => {
@@ -473,6 +474,9 @@ impl Buffer {
 
     /// save to disk
     pub fn save(&mut self) -> io::Result<()> {
+        if self.name.is_none() {
+            return Err(io::Error::new(io::ErrorKind::Other, "no path specified"));
+        }
         if self.readonly {
             return Err(io::Error::other("Buffer is readonly"))
         }
@@ -480,7 +484,7 @@ impl Buffer {
             return Err(io::Error::other("No write permission to file"))
         }
         if self.file.is_none() {
-            let file = File::options().create(true).write(true).open(self.name.clone())?;
+            let file = File::options().create(true).read(true).write(true).open(self.name.clone().unwrap())?;
             self.file = Some(Arc::new(Mutex::new(file)));
         }
         let binding = self.file.clone().unwrap();
@@ -489,16 +493,19 @@ impl Buffer {
         file.write_all(self.content.as_bytes())?;
         file.set_len(self.content.len() as u64)?;
 
-        info!("Wrote {} bytes to {}", self.content.as_bytes().len(), self.name);
+        info!("Wrote {} bytes to {}", self.content.as_bytes().len(), self.name.clone().unwrap());
 
         Ok(())
     }
 
     #[tracing::instrument(skip(self), level="debug")]
     pub fn save_as_root(&mut self) -> io::Result<()> {
+        if self.name.is_none() {
+            return Err(io::Error::new(io::ErrorKind::Other, "no path specified"));
+        }
         let (reader, mut writer) = io::pipe()?;
         let mut dd = process::Command::new(PRIVESC_CMD)
-            .args(vec!["dd", "bs=4k", &format!("of={}", self.name)])
+            .args(vec!["dd", "bs=4k", &format!("of={}", self.name.clone().unwrap())])
             .stdin(reader)
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
@@ -526,7 +533,7 @@ impl Buffer {
                 file.read_to_string(&mut filecontent)?;
                 Ok(filecontent != self.content)
             },
-            None => Ok(self.content.is_empty()),
+            None => Ok(true),
         }
     }
 
@@ -642,3 +649,11 @@ fn linestarts_no_lb() {
     println!("{:?}", buf.linestarts);
     assert!(buf.linestarts == vec![0,3]);
 }
+
+#[test]
+fn linestarts_empty() {
+    let buf = Buffer::empty();
+    println!("{:?}", buf.linestarts);
+    assert!(buf.linestarts == vec![0,0]);
+}
+

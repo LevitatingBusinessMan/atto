@@ -62,7 +62,7 @@ impl View for Model {
 
         let current_buffer = self.current_buffer();
 
-        let cache = self.parse_caches.get(&current_buffer.name).unwrap().clone();
+        let cache = self.parse_caches.get(&current_buffer.name.clone().unwrap_or("?".to_string())).unwrap().clone();
 
         let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, cache, &self.syntax_set, self.theme(), self.show_whitespace) {
             Ok(tokens) => Paragraph::new(tokens),
@@ -107,8 +107,8 @@ impl View for Model {
                             self.current_buffer().cursor.x + 1,
                             self.current_buffer().cursor.y + 1,
                             self.current_buffer().position,
-                            self.current_buffer().name,
-                            if self.current_buffer().dirty().unwrap_or_else(|e| {tracing::error!("{:?}", e); true}) { "+" } else { "" },
+                            self.current_buffer().name.clone().unwrap_or("?".to_string()),
+                            if self.current_buffer().dirty().unwrap() { "+" } else { "" },
                             self.selected+1, self.buffers.len(),
                         ),
                         width = main[1].width as usize - "Welcome to Atto! Ctrl-h for help".len() - 3

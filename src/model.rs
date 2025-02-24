@@ -36,7 +36,7 @@ impl Model {
         let parse_caches = (|| {
             let mut map = HashMap::new();
             for buf in &buffers {
-                map.insert(buf.name.clone(), Rc::new(RefCell::new(ParseCache::new())));
+                map.insert(buf.name.clone().unwrap_or("?".to_string()), Rc::new(RefCell::new(ParseCache::new())));
             }
             map
         })();

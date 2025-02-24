@@ -95,18 +95,24 @@ fn main() -> anyhow::Result<()> {
 fn read_files(paths: &Vec<String>) -> io::Result<Vec<Buffer>> {
     let mut buffers: Vec<Buffer> = Vec::with_capacity(paths.len());
     for path in paths.iter() {
-        let (file, readonly) = match fs::File::options().create(true).read(true).write(true).open(path) {
-            Ok(f) => (f, false),
+        let buf = match fs::File::options().read(true).write(true).open(path) {
+            Ok(f) => Buffer::new(path.clone(), f, false),
             Err(err) => match err.kind() {
                 io::ErrorKind::PermissionDenied => {
                     tracing::debug!("Permission denied opening {path:?}, attempting to open readonly");
-                    (fs::File::options().read(true).open(path)?, true)
-                }
+                    let f = fs::File::options().read(true).open(path)?;
+                    Buffer::new(path.clone(), f, true)
+                },
+                io::ErrorKind::NotFound => {
+                    let mut buf = Buffer::empty();
+                    buf.name = Some(path.clone());
+                    buf
+                },
                 _ => return Err(err)
             },
         };
 
-        buffers.push(Buffer::new(path.clone(), file, readonly));
+        buffers.push(buf);
     }
     Ok(buffers)
 }
