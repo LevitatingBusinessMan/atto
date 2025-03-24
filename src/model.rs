@@ -261,7 +261,8 @@ impl Model {
                     stdout().execute(EnableMouseCapture);
                     self.mouse_capture = true;
                 }
-            }
+            },
+            Message::DragMouseLeft => {},
         }
         None
     }
@@ -327,4 +328,5 @@ pub enum Message {
     Suspend,
     NewEmptyBuffer,
     ToggleMouseCapture,
+    DragMouseLeft,
 }

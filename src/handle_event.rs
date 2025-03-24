@@ -147,6 +147,7 @@ fn handle_mouse(mouse: event::MouseEvent) -> Option<Message> {
         event::MouseEventKind::ScrollDown => Some(Message::ScrollDown),
         event::MouseEventKind::ScrollUp => Some(Message::ScrollUp),
         event::MouseEventKind::Down(MouseButton::Left) => Some(Message::MouseLeft(mouse.column, mouse.row)),
+        //event::MouseEventKind::Drag(MouseButton::Left) => Some(Message::DragMouseLeft),
         _ => None
     }
 }
