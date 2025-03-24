@@ -1,5 +1,6 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Mutex};
+use std::{cell::RefCell, collections::HashMap, io::stdout, rc::Rc, sync::Mutex};
 
+use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
 use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}, Terminal};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error};
@@ -28,6 +29,8 @@ pub struct Model {
     pub notification: Option<Notification>,
     /// visualize whitespace
     pub show_whitespace: bool,
+    /// is mouse_capture enabled
+    pub mouse_capture: bool,
 }
 
 impl Model {
@@ -56,6 +59,7 @@ impl Model {
             viewport,
             notification: None,
             show_whitespace: false,
+            mouse_capture: true,
         }
     }
 
@@ -248,6 +252,15 @@ impl Model {
             Message::NewEmptyBuffer => {
                 self.buffers.push(Buffer::empty());
                 self.selected = self.buffers.len() - 1;
+            },
+            Message::ToggleMouseCapture => {
+                if self.mouse_capture {
+                    stdout().execute(DisableMouseCapture);
+                    self.mouse_capture = false;
+                } else {
+                    stdout().execute(EnableMouseCapture);
+                    self.mouse_capture = true;
+                }
             }
         }
         None
@@ -313,4 +326,5 @@ pub enum Message {
     Tab,
     Suspend,
     NewEmptyBuffer,
+    ToggleMouseCapture,
 }

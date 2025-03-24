@@ -2,6 +2,7 @@
 
 use std::io::stdout;
 
+use crossterm::{event::DisableMouseCapture, ExecutableCommand, QueueableCommand};
 use nix::unistd::Pid;
 use ratatui::{style::{Color, Style}, widgets::{Clear, Paragraph, Wrap}};
 use indoc::indoc;
@@ -32,6 +33,9 @@ impl super::Utility for DeveloperModel {
                     'n' => {
                         Some(Message::NewEmptyBuffer)
                     },
+                    'm' => {
+                        Some(Message::ToggleMouseCapture)
+                    },
                     _ => None
                 }
             },
@@ -43,6 +47,7 @@ impl super::Utility for DeveloperModel {
         * e - create an error notification
         * z - experiemntal suspend option
         * n - new buffer
+        * m - toggle mouse capture
         "}, f, area);
     }
 }
