@@ -338,7 +338,7 @@ impl Buffer {
     }
 
     pub fn page_down(&mut self, height: usize) {
-        self.top = cmp::min(self.top + height, self.linestarts.len() - height);
+        self.top = cmp::min(self.top + height, self.linestarts.len().saturating_sub(height));
         self.cursor.y = cmp::min(self.cursor.y + height, self.linestarts.len() - 2);
         self.place_cursor_x(self.cursor.x);
         self.update_position();
