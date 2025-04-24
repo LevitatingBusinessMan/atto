@@ -84,8 +84,8 @@ fn main() -> anyhow::Result<()> {
         let mut msg = handle_event(&model, &mut event_state)?;
         while msg.is_some() {
             msg = model.update(msg.unwrap());
+            TERMINAL.get().unwrap().lock().unwrap().draw(|frame| model.view(frame))?;
         }
-        TERMINAL.get().unwrap().lock().unwrap().draw(|frame| model.view(frame))?;
     }
 
     tui::restore()?;
