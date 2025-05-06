@@ -5,6 +5,8 @@ use unicode_segmentation::{GraphemeCursor, GraphemeIndices, UnicodeSegmentation}
 use unicode_width::UnicodeWidthStr;
 use which::which;
 
+use crate::{logging::LogError, parse::{perform_str_replacements, CachedParseState, ParseCacheTrait}};
+
 pub static PRIVESC_CMD: LazyLock<&'static str> = LazyLock::new(|| {
     if which("run0").is_ok() {
         "run0"
