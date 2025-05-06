@@ -1,7 +1,7 @@
-use std::{cell::RefCell, cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, rc::Rc, sync::{Arc, LazyLock, Mutex}, usize};
+use std::{cell::RefCell, cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, os::fd::IntoRawFd, process::{self, Stdio}, rc::Rc, sync::{Arc, LazyLock, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
-use tracing::{debug, info};
-use unicode_segmentation::{GraphemeCursor, GraphemeIndices, UnicodeSegmentation};
+use tracing::info;
+use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use unicode_width::UnicodeWidthStr;
 use which::which;
 

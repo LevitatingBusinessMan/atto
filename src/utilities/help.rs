@@ -1,5 +1,4 @@
 use indoc::indoc;
-use ratatui::widgets::{Clear, Paragraph, Wrap};
 
 use super::Utility;
 

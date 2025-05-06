@@ -5,9 +5,9 @@
 #![feature(panic_payload_as_str)]
 #![feature(anonymous_pipe)]
 #![feature(read_buf)]
-use std::{fs::{self, File}, io::{self, Error, Stdout}, iter::Once, path::PathBuf, rc::Rc, sync::{LazyLock, Mutex, OnceLock}};
+use std::{fs::{self}, io::{self, Stdout}, path::PathBuf, sync::{Mutex, OnceLock}};
 
-use clap::{crate_version, Arg, Parser};
+use clap::{crate_version, Parser};
 use anyhow;
 
 mod buffer;
@@ -120,7 +120,7 @@ fn read_files(paths: &Vec<String>) -> io::Result<Vec<Buffer>> {
 mod tui {
     use std::{io::{self, stdout, Stdout}, panic};
     use crossterm::{terminal::*, event::*, ExecutableCommand, QueueableCommand};
-    use ratatui::{Terminal, backend::{CrosstermBackend, Backend}};
+    use ratatui::{Terminal, backend::CrosstermBackend};
 
     pub fn setup() -> io::Result<()> {
         stdout().execute(EnterAlternateScreen)?;

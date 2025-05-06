@@ -1,7 +1,5 @@
-use ratatui::widgets::{Clear, Paragraph};
 
 use crate::model::Message;
-use indoc::indoc;
 
 pub struct ConfirmModel {
     pub msg: String,

@@ -1,13 +1,10 @@
 //! A utility for testing
 
-use std::io::stdout;
 
-use crossterm::{event::DisableMouseCapture, ExecutableCommand, QueueableCommand};
-use nix::unistd::Pid;
-use ratatui::{style::{Color, Style}, widgets::{Clear, Paragraph, Wrap}};
+use ratatui::style::{Color, Style};
 use indoc::indoc;
 
-use crate::{model::Message, notification::Notification};
+use crate::model::Message;
 
 pub struct DeveloperModel();
 

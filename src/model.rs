@@ -1,12 +1,11 @@
-use std::{cell::RefCell, collections::HashMap, io::stdout, rc::Rc, sync::{LazyLock, Mutex}};
+use std::io::stdout;
 
 use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
-use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}, Terminal};
+use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{buffer::{self, Buffer}, logging::LogError, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
-use crate::parse::ParseCache;
 use crate::notification::Notification;
 
 pub struct Model {

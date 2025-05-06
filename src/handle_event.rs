@@ -2,7 +2,7 @@ use std::time;
 
 use anyhow::Ok;
 use crossterm::event::{self, KeyCode, KeyModifiers, MouseButton};
-use tracing::{debug, trace};
+use tracing::debug;
 
 use crate::model::{Model, Message};
 

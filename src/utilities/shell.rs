@@ -1,13 +1,11 @@
-use std::{cmp, env, io::{self, stdout, BufRead, BufReader, Read, Stdout, Write}, os::fd::{AsRawFd, BorrowedFd}, process::{self, Command, Stdio}, sync::Mutex};
+use std::{cmp, io::{self, Read, Write}, os::fd::{AsRawFd, BorrowedFd}, process::{Command, Stdio}, sync::Mutex};
 
-use crossterm::{event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags}, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}, ExecutableCommand, QueueableCommand};
-use nix::{libc::POLLIN, poll::{poll, PollFd, PollFlags, PollTimeout}, sys::{select::FdSet, time::TimeVal}};
-use ratatui::{layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, widgets::{Clear, Paragraph}, Frame};
-use tracing::{debug, error, warn};
+use nix::poll::{poll, PollFd, PollFlags};
+use ratatui::{layout::Rect, style::{Color, Style}, Frame};
+use tracing::{debug, warn};
 
-use crate::{logging::LogError, model::{Message, Model}, TERMINAL};
+use crate::{logging::LogError, model::{Message, Model}};
 
-use super::default_view;
 
 //static UNIX_SHELL: &'static str = "sh";
 static UNIX_SHELL: &'static str = "fish";

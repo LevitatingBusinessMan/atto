@@ -8,8 +8,7 @@ use ratatui::text::{Span, Line};
 use syntect::parsing::{ParseState, SyntaxReference, ScopeStack, SyntaxSet};
 use syntect::highlighting::{HighlightState, Highlighter, HighlightIterator};
 use syntect::util::LinesWithEndings;
-use tracing::{debug, trace};
-use tracing_subscriber::field::debug;
+use tracing::debug;
 use unicode_segmentation::UnicodeSegmentation;
 use crate::syntect_tui::{self, SyntectTuiError};
 

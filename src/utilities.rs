@@ -4,7 +4,7 @@ pub mod confirm;
 pub mod developer;
 pub mod shell;
 
-use ratatui::{layout::Rect, style::{Style, Stylize}, widgets::{Block, Borders, Padding}, Frame};
+use ratatui::{layout::Rect, style::{Style, Stylize}, widgets::{Block, Borders}, Frame};
 
 use crate::model::{Message, Model};
 
