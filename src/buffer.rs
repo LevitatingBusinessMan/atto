@@ -1,13 +1,17 @@
-use std::{cell::RefCell, cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, rc::Rc, sync::{Arc, Mutex}, usize};
+use std::{cell::RefCell, cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Stderr, Write}, os::fd::IntoRawFd, process::{self, Stdio}, rc::Rc, sync::{Arc, LazyLock, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{debug, info};
 use unicode_segmentation::{GraphemeCursor, GraphemeIndices, UnicodeSegmentation};
 use unicode_width::UnicodeWidthStr;
+use which::which;
 
-
-use crate::{logging::LogError, parse::*};
-
-pub static PRIVESC_CMD: &'static str = "run0";
+pub static PRIVESC_CMD: LazyLock<&'static str> = LazyLock::new(|| {
+    if which("run0").is_ok() {
+        "run0"
+    } else {
+        "sudo"
+    }
+});
 
 #[derive(Clone, Debug)]
 pub struct Buffer {
@@ -507,7 +511,7 @@ impl Buffer {
             return Err(io::Error::new(io::ErrorKind::Other, "no path specified"));
         }
         let (reader, mut writer) = io::pipe()?;
-        let mut dd = process::Command::new(PRIVESC_CMD)
+        let mut dd = process::Command::new(*PRIVESC_CMD)
             .args(vec!["dd", "bs=4k", &format!("of={}", self.name.clone().unwrap())])
             .stdin(reader)
             .stdout(Stdio::null())

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, io::stdout, rc::Rc, sync::Mutex};
+use std::{cell::RefCell, collections::HashMap, io::stdout, rc::Rc, sync::{LazyLock, Mutex}};
 
 use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
 use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}, Terminal};
@@ -219,7 +219,7 @@ impl Model {
             Message::SaveAsRootConfirmation => {
                 self.utility = Some(UtilityWindow::Confirm(
                     utilities::confirm::ConfirmModel::new(
-                        format!("Do you want to save this file using {}?", buffer::PRIVESC_CMD),
+                        format!("Do you want to save this file using {}?", *buffer::PRIVESC_CMD),
                         vec![
                             ('y', Message::SaveAsRoot),
                             ('n', Message::NoMessage)
