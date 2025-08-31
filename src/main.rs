@@ -1,9 +1,6 @@
 #![feature(int_roundings)]
 #![feature(io_error_more)]
 #![feature(iter_advance_by)]
-#![feature(let_chains)]
-#![feature(panic_payload_as_str)]
-#![feature(anonymous_pipe)]
 #![feature(read_buf)]
 use std::{fs::{self}, io::{self, Stdout}, path::PathBuf, sync::{Mutex, OnceLock}};
 
