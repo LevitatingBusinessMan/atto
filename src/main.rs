@@ -154,8 +154,7 @@ mod tui {
     pub fn install_panic_hook() {
         let original_hook = panic::take_hook();
         panic::set_hook(Box::new(move |info| {
-            stdout().execute(LeaveAlternateScreen).unwrap();
-            disable_raw_mode().unwrap();
+            let _ = restore();
             tracing::error!("PANIC at {}: {}", info.location().unwrap(), info.payload_as_str().unwrap_or(""));
             original_hook(info);
         }));
