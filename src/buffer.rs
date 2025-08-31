@@ -8,11 +8,13 @@ use which::which;
 use crate::{logging::LogError, parse::{perform_str_replacements, CachedParseState, ParseCacheTrait}};
 
 pub static PRIVESC_CMD: LazyLock<&'static str> = LazyLock::new(|| {
-    if which("run0").is_ok() {
-        "run0"
-    } else {
-        "sudo"
+    let cmds = vec!["run0", "sudo", "doas"];
+    for cmd in cmds {
+        if which(cmd).is_ok() {
+            return cmd;
+        }
     }
+    return "sudo";
 });
 
 #[derive(Clone, Debug)]
@@ -507,7 +509,7 @@ impl Buffer {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self), level="debug")]
+    #[tracing::instrument(skip(self), level="debug", fields(cmd = *PRIVESC_CMD))]
     pub fn save_as_root(&mut self) -> io::Result<()> {
         if self.name.is_none() {
             return Err(io::Error::new(io::ErrorKind::Other, "no path specified"));
@@ -524,7 +526,10 @@ impl Buffer {
         nix::unistd::close(writer.into_raw_fd())?;
         let status = dd.wait()?;
         match status.success() {
-            true => Ok(()),
+            true => {
+                info!("Wrote {} bytes to {} using {} dd", self.content.as_bytes().len(), self.name.clone().unwrap(), *PRIVESC_CMD);
+                Ok(())
+            },
             false => {
                 let mut stderr = String::new();
                 dd.stderr.unwrap().read_to_string(&mut stderr)?;
