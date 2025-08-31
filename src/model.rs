@@ -113,6 +113,7 @@ impl Model {
                 }
             },
             Message::ScrollDown => {
+                // TODO fix substract with overflow error
                 if (self.current_buffer().content.lines().count() + 1 - self.viewport.height as usize) > self.current_buffer_mut().top {
                     self.current_buffer_mut().top += 2;
                 }
