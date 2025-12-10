@@ -68,7 +68,7 @@ impl ShellModel {
                     stdout_pipe.read_to_end(&mut stdout)?;
                     stderr_pipe.read_to_end(&mut stderr)?;
                     debug!("Total {}b stdout, {}b stderr", stdout.len(), stderr.len());
-                    
+
                     let stdout = String::from_utf8(stdout);
                     let stderr = String::from_utf8(stderr);
 
@@ -110,7 +110,7 @@ impl ShellModel {
                         else {
                             format!("{}\n{}", stdout.trim(), stderr.trim())
                         };
-                
+
                         return Ok(Message::Notification(display, style))
                     }
                 },
@@ -176,7 +176,7 @@ impl super::Utility for ShellModel {
         None
     }
 
-    fn view(&self, m: &Model, f: &mut Frame, area: Rect) {
+    fn view(&self, f: &mut Frame, area: Rect) {
         super::default_view("Shell", &self.entry, f, area);
     }
 }

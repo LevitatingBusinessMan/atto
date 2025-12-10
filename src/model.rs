@@ -18,8 +18,8 @@ pub struct Model {
     /// The utility window
     pub utility: Option<UtilityWindow>,
     /// Tell the view it may have to scroll
-    /// the buffer because the cursor might've moved 
-    /// out of view; 
+    /// the buffer because the cursor might've moved
+    /// out of view;
     pub may_scroll: bool,
     pub theme_set: ThemeSet,
     pub syntax_set: SyntaxSet,
@@ -167,7 +167,11 @@ impl Model {
             Message::GotoEndOfLine => self.current_buffer_mut().goto_end_of_line(),
             Message::Enter => return Some(Message::InsertChar('\n')),
             Message::Find(query) => {
-                self.current_buffer_mut().find(query);
+                let occurences = self.current_buffer_mut().find(query);
+                // if the find utility is open, set the occurences
+                if let Some(UtilityWindow::Find(find)) = &mut self.utility {
+                    find.occurences = Some(occurences);
+                }
                 self.may_scroll = true;
             },
             Message::Save => {

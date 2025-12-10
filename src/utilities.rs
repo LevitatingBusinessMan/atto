@@ -4,7 +4,7 @@ pub mod confirm;
 pub mod developer;
 pub mod shell;
 
-use ratatui::{layout::Rect, style::{Style, Stylize}, widgets::{Block, Borders}, Frame};
+use ratatui::{Frame, layout::Rect, style::{Style, Stylize}, widgets::{Block, Borders, Paragraph}};
 
 use crate::model::{Message, Model};
 
@@ -18,7 +18,7 @@ pub trait Utility {
     }
     /// Given the maximum allowed area size
     /// the widget can draw itself
-    fn view(&self, m: &Model, f: &mut Frame, area: Rect);
+    fn view(&self, f: &mut Frame, area: Rect);
 }
 
 /// Utilitis are encouraged to render themselves in this block

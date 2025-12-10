@@ -309,9 +309,9 @@ impl Buffer {
     //     } else if !self.is_last_line() {
     //         self.prefered_col = Some(0);
     //         self.move_down();
-    //     } 
+    //     }
     // }
-    
+
 
     /// place the x cursor anywhere on the line,
     /// assuming cursor.y is set this will move it to position or eol
@@ -451,7 +451,8 @@ impl Buffer {
         return self.content.chars().nth(self.position).unwrap();
     }
 
-    pub fn find(&mut self, query: String) {
+    /// find a query through the buffer, set highlights field and return count
+    pub fn find(&mut self, query: String) -> usize {
         let matches: Vec<_> = self.content.match_indices(&query).map(|(start, match_)| {
             (start, start + match_.len())
         }).collect();
@@ -462,6 +463,7 @@ impl Buffer {
         }
 
         self.highlights = matches;
+        return self.highlights.len()
     }
 
     // Tries to find and set a syntax
@@ -670,4 +672,3 @@ fn linestarts_empty() {
     println!("{:?}", buf.linestarts);
     assert!(buf.linestarts == vec![0,0]);
 }
-

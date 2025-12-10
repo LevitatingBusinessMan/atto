@@ -39,7 +39,7 @@ impl super::Utility for DeveloperModel {
             msg => Some(msg)
         }
     }
-    fn view(&self, m: &crate::model::Model, f: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+    fn view(&self, f: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
         super::default_view("brrrrr", indoc! {"
         * e - create an error notification
         * z - experiemntal suspend option

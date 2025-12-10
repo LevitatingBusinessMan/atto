@@ -10,7 +10,7 @@ pub struct Notification {
 }
 
 impl Notification {
-    /// The base duration 
+    /// The base duration
     pub const TIMEOUT_BASE: Duration = Duration::from_millis(1000);
     /// The function that calculates how long a timeout should be
     #[inline]

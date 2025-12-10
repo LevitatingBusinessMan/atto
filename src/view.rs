@@ -77,6 +77,7 @@ impl View for Model {
         );
 
         // if in view, display cursor
+        // TODO fix scrolling up and cursor stickking at the bottom
         if self.current_buffer().cursor.y >= self.current_buffer().top {
             f.set_cursor_position((self.current_buffer().cursor.x as u16, self.current_buffer().cursor.y as u16 - self.current_buffer().top as u16));
         }
@@ -92,7 +93,7 @@ impl View for Model {
                 &mut scrollbar_state
             );
         }
-    
+
         f.render_widget(
             Paragraph::new(
                 Line::styled(
@@ -119,11 +120,11 @@ impl View for Model {
         );
 
         match &self.utility {
-            Some(UtilityWindow::Help(help)) => help.view(&self, f, utility_area),
-            Some(UtilityWindow::Find(find)) => find.view(&self, f, utility_area),
-            Some(UtilityWindow::Confirm(confirm)) => confirm.view(&self, f, utility_area),
-            Some(UtilityWindow::Developer(developer)) => developer.view(&self, f, utility_area),
-            Some(UtilityWindow::Shell(shell)) => shell.view(&self, f, utility_area),
+            Some(UtilityWindow::Help(help)) => help.view(f, utility_area),
+            Some(UtilityWindow::Find(find)) => find.view(f, utility_area),
+            Some(UtilityWindow::Confirm(confirm)) => confirm.view(f, utility_area),
+            Some(UtilityWindow::Developer(developer)) => developer.view(f, utility_area),
+            Some(UtilityWindow::Shell(shell)) => shell.view(f, utility_area),
             None => {},
         }
 

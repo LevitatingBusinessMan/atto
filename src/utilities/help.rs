@@ -5,7 +5,7 @@ use super::Utility;
 pub struct HelpModel();
 
 impl Utility for HelpModel {
-    fn view(&self, m: &crate::model::Model, f: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+    fn view(&self, f: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
         super::default_view("Help", indoc! {"
         Welcome to Atto!
         Here is a list of keybinds:

@@ -2,7 +2,7 @@ use std::{fs, io};
 use dirs;
 
 use tracing::{info, level_filters::LevelFilter, Level};
-use tracing_subscriber::{fmt::{format::FmtSpan, writer::MakeWriterExt}, layer::SubscriberExt, Layer, Registry};
+use tracing_subscriber::{fmt::{format::FmtSpan}, layer::SubscriberExt, Layer, Registry};
 use unicode_segmentation::GraphemeIncomplete;
 
 pub fn setup_logging(args: &crate::Args) -> io::Result<()> {

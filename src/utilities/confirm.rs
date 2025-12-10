@@ -29,8 +29,8 @@ impl super::Utility for ConfirmModel {
             msg => Some(msg)
         }
     }
-    
-    fn view(&self, m: &crate::model::Model, f: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+
+    fn view(&self, f: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
         let choicesstring= self.choices.iter().map(|(c, _a)| c.to_string()).collect::<Vec<_>>().join("/");
         let content =  format!("{}: {}", self.msg, choicesstring);
         super::default_view("Confirm", &content, f, area);
