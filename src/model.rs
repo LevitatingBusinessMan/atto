@@ -3,7 +3,7 @@ use std::io::stdout;
 use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
 use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::{buffer::{self, Buffer}, logging::LogError, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
 use crate::notification::Notification;
@@ -20,6 +20,8 @@ pub struct Model {
     /// Tell the view it may have to scroll
     /// the buffer because the cursor might've moved
     /// out of view;
+    /// Basically I should've called this `cursor_moved`
+    /// but alas.
     pub may_scroll: bool,
     pub theme_set: ThemeSet,
     pub syntax_set: SyntaxSet,
@@ -84,6 +86,8 @@ impl Model {
 
         if new_msg.is_none() {
             return None
+        } else {
+            debug!("Utility returned {:?}", &new_msg.as_ref().unwrap());
         }
 
         let msg = new_msg.unwrap();
@@ -167,11 +171,12 @@ impl Model {
             Message::GotoEndOfLine => self.current_buffer_mut().goto_end_of_line(),
             Message::Enter => return Some(Message::InsertChar('\n')),
             Message::Find(query) => {
-                let occurences = self.current_buffer_mut().find(query);
+                let occurences = self.current_buffer_mut().highlight(query);
                 // if the find utility is open, set the occurences
                 if let Some(UtilityWindow::Find(find)) = &mut self.utility {
                     find.occurences = Some(occurences);
                 }
+                self.current_buffer_mut().jump_next_highlight();
                 self.may_scroll = true;
             },
             Message::Save => {
@@ -267,6 +272,10 @@ impl Model {
                 }
             },
             Message::DragMouseLeft => {},
+            Message::JumpNextHighlight => {
+                self.current_buffer_mut().jump_next_highlight();
+                self.may_scroll = true;
+            }
         }
         None
     }
@@ -333,4 +342,5 @@ pub enum Message {
     NewEmptyBuffer,
     ToggleMouseCapture,
     DragMouseLeft,
+    JumpNextHighlight,
 }

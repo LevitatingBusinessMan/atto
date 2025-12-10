@@ -1,6 +1,6 @@
 use std::{cell::RefCell, cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, os::fd::IntoRawFd, process::{self, Stdio}, rc::Rc, sync::{Arc, LazyLock, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
-use tracing::info;
+use tracing::{info, trace, warn};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use unicode_width::UnicodeWidthStr;
 use which::which;
@@ -39,6 +39,7 @@ pub struct Buffer {
     /// The cached parse states for this buffer
     pub parse_cache: Rc<RefCell<HashMap<usize, CachedParseState>>>,
     pub syntax: Option<SyntaxReference>,
+    /// start and end positions of highlgihts
     pub highlights: Vec<(usize, usize)>,
     pub dirty: bool,
 }
@@ -452,18 +453,33 @@ impl Buffer {
     }
 
     /// find a query through the buffer, set highlights field and return count
-    pub fn find(&mut self, query: String) -> usize {
+    pub fn highlight(&mut self, query: String) -> usize {
         let matches: Vec<_> = self.content.match_indices(&query).map(|(start, match_)| {
             (start, start + match_.len())
         }).collect();
 
-        // scroll to first match
-        if let Some((start, _end)) = matches.iter().find(|(start, _end)| start >= &self.position) {
-            self.position = *start
-        }
-
         self.highlights = matches;
         return self.highlights.len()
+    }
+
+    /// Jump the cursor to the end of next highlight
+    pub fn jump_next_highlight(&mut self) {
+        if self.highlights.is_empty() {
+            return
+        }
+        let first = self.highlights.first().unwrap();
+        let last = self.highlights.last().unwrap();
+        // jump somewhere forward
+        if last.1 > self.position {
+            if let Some((_start, end)) = self.highlights.iter().find(|(_start, end)| self.position < *end) {
+                self.position = *end;
+            }
+        }
+        // loop over
+        else {
+            self.position = first.1;
+        }
+        self.update_cursor();
     }
 
     // Tries to find and set a syntax

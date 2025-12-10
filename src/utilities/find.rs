@@ -25,21 +25,20 @@ impl utilities::Utility for FindModel {
 
    fn update(&mut self, msg: Message) -> Option<Message> {
        match msg {
-           Message::OpenFind => {
-               // jump to next highlight
-               None
+           Message::OpenFind | Message::Enter => {
+               Some(Message::JumpNextHighlight)
            },
            Message::InsertChar(c) => {
-               if c != '\n' {
-                   self.entry.push(c);
-                   Some(Message::Find(self.entry.clone()))
-               } else {
-                   None
-               }
+                self.entry.push(c);
+                Some(Message::Find(self.entry.clone()))
            },
            Message::Backspace => {
             self.entry.pop();
-            Some(Message::Find(self.entry.clone()))
+            if !self.entry.is_empty() {
+                Some(Message::Find(self.entry.clone()))
+            } else {
+                None
+            }
            },
            // we could do a thing where if it receives an ambigious Message:Next
            // it can choose to replace it with a Message:NextSelection or Message::NextHighlight

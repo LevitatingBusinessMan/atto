@@ -3,6 +3,7 @@
 use color_eyre::owo_colors::OwoColorize;
 use ratatui::{layout::{Alignment, Constraint, Direction, Layout}, style::{Style, Stylize}, text::Line, widgets::{Clear, Paragraph, Scrollbar, ScrollbarState}, Frame};
 use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
+use tracing::trace;
 
 use crate::{model::Model, parse::parse_from, utilities::{Utility}};
 use crate::buffer::Buffer;
@@ -47,7 +48,9 @@ impl View for Model {
             let may_scroll = self.may_scroll;
             let cursor_y = self.current_buffer().cursor.y;
             let current_buffer = self.current_buffer_mut();
+            trace!("may_scroll: {may_scroll}");
             if may_scroll {
+                tracing::debug!("CROLL");
                 if cursor_y < current_buffer.top {
                     current_buffer.top = cursor_y as usize;
                 } else if cursor_y >= current_buffer.top + buffer_and_scrollbar[0].height as usize{

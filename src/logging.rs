@@ -1,11 +1,16 @@
 use std::{fs, io};
 use dirs;
 
-use tracing::{info, level_filters::LevelFilter, Level};
-use tracing_subscriber::{fmt::{format::FmtSpan}, layer::SubscriberExt, Layer, Registry};
+use tracing::{Level, debug, info, level_filters::LevelFilter};
+use tracing_subscriber::{EnvFilter, Layer, Registry, fmt::format::FmtSpan, layer::SubscriberExt};
 use unicode_segmentation::GraphemeIncomplete;
 
 pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
+    let default_level = if args.debug || cfg!(debug_assertions) { Level::TRACE } else { Level::INFO };
+    let env = EnvFilter::builder()
+            .with_default_directive(default_level.into())
+            .from_env().map_err(|_| io::Error::other("env filter failed"))?;
+
     let file = fs::File::options()
         .write(true)
         .append(true)
@@ -17,22 +22,19 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
             )
         )?;
 
-    let level = if args.debug || cfg!(debug_assertions) { Level::TRACE } else { Level::INFO };
-
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_line_number(true)
         .with_writer(file)
         .with_target(true)
         .with_ansi(true)
-        .with_span_events(FmtSpan::CLOSE)
-        .with_filter(LevelFilter::from_level(level));
+        .with_span_events(FmtSpan::CLOSE);
+        //.with_filter(LevelFilter::from_level(level));
 
     let subscriber = Registry::default()
+        .with(env)
         .with(fmt_layer);
 
     let _ = tracing::subscriber::set_global_default(subscriber);
-
-    info!("log level is {level:?}");
 
     Ok(())
 }
