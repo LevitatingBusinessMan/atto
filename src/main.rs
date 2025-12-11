@@ -23,7 +23,6 @@ mod suspend;
 use logging::{setup_logging, LogError};
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};
 use tracing::info;
-use view::View;
 use model::Model;
 use handle_event::handle_event;
 use buffer::Buffer;
@@ -157,4 +156,3 @@ mod tui {
         }));
     }
 }
-

@@ -32,6 +32,8 @@ pub struct Model {
     pub show_whitespace: bool,
     /// is mouse_capture enabled
     pub mouse_capture: bool,
+    /// tell the view code to center the view
+    pub center_view: bool,
 }
 
 impl Model {
@@ -61,6 +63,7 @@ impl Model {
             notification: None,
             show_whitespace: false,
             mouse_capture: true,
+            center_view: false,
         }
     }
 
@@ -179,8 +182,7 @@ impl Model {
                 if let Some(UtilityWindow::Find(find)) = &mut self.utility {
                     find.occurences = Some(occurences);
                 }
-                self.current_buffer_mut().jump_next_highlight();
-                self.may_scroll = true;
+               return Some(Message::JumpNextHighlight);
             },
             Message::Save => {
                 if self.current_buffer().name.is_none() {
@@ -281,7 +283,7 @@ impl Model {
             Message::DragMouseLeft => {},
             Message::JumpNextHighlight => {
                 self.current_buffer_mut().jump_next_highlight();
-                self.may_scroll = true;
+                self.center_view = true;
             },
             Message::SaveAs(path) => {
                 let old = self.current_buffer().name.clone();

@@ -12,13 +12,9 @@ use crate::utilities::UtilityWindow;
 /// files over this size might be handled differently (like not having a scrollbar)
 pub static LARGE_FILE_LIMIT: usize = 1_000_000;
 
-pub trait View {
-    fn view(&mut self, f: &mut Frame);
-}
-
-impl View for Model {
+impl Model {
     #[tracing::instrument(skip_all, level="trace")]
-    fn view(&mut self, f: &mut Frame) {
+    pub fn view(&mut self, f: &mut Frame) {
         // split between status bar and rest
         let main = Layout::default()
                 .direction(Direction::Vertical)
@@ -44,20 +40,23 @@ impl View for Model {
             .split(vertical_middle_split[0])[1];
 
         // Scroll the buffer if the cursor was moved out of view.
-        {
-            let may_scroll = self.may_scroll;
+        if self.may_scroll {
             let cursor_y = self.current_buffer().cursor.y;
             let current_buffer = self.current_buffer_mut();
-            trace!("may_scroll: {may_scroll}");
-            if may_scroll {
-                if cursor_y < current_buffer.top {
-                    current_buffer.top = cursor_y as usize;
-                } else if cursor_y >= current_buffer.top + buffer_and_scrollbar[0].height as usize {
-                    let diff = cursor_y - (current_buffer.top + buffer_and_scrollbar[0].height as usize);
-                    current_buffer.top += diff as usize + 1;
-                }
+            trace!("may_scroll is true");
+            if cursor_y < current_buffer.top {
+                current_buffer.top = cursor_y as usize;
+            } else if cursor_y >= current_buffer.top + buffer_and_scrollbar[0].height as usize {
+                let diff = cursor_y - (current_buffer.top + buffer_and_scrollbar[0].height as usize);
+                current_buffer.top += diff as usize + 1;
             }
             self.may_scroll = false;
+        }
+
+        if self.center_view {
+            let half_height = buffer_and_scrollbar[0].height / 2;
+            self.current_buffer_mut().top = self.current_buffer().cursor.y.saturating_sub(half_height as usize);
+            self.center_view = false;
         }
 
         let current_buffer = self.current_buffer();
