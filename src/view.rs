@@ -85,7 +85,6 @@ impl Model {
         let layout = self.layout();
 
         let content_height = self.current_buffer().linestarts.len() - 1;
-        let scrollbar_width = if content_height as u16 > self.viewport.height {1} else {0};
 
         let current_buffer = self.current_buffer();
 

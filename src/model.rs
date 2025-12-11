@@ -281,6 +281,10 @@ impl Model {
                 self.current_buffer_mut().jump_next_highlight();
                 center_view = true;
             },
+            Message::JumpPreviousHighlight => {
+                self.current_buffer_mut().jump_previous_highlight();
+                center_view = true;
+            },
             Message::SaveAs(path) => {
                 let old = self.current_buffer().name.clone();
                 self.current_buffer_mut().name = Some(path);
@@ -396,6 +400,7 @@ pub enum Message {
     ToggleMouseCapture,
     DragMouseLeft,
     JumpNextHighlight,
+    JumpPreviousHighlight,
     // save under the following name, updating the buffer path
     SaveAs(String),
 }

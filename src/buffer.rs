@@ -483,6 +483,26 @@ impl Buffer {
         self.update_cursor();
     }
 
+    /// Jump the cursor to the end of previous highlight
+    pub fn jump_previous_highlight(&mut self) {
+        if self.highlights.is_empty() {
+            return
+        }
+        let first = self.highlights.first().unwrap();
+        let last = self.highlights.last().unwrap();
+        // jump somewhere backwards
+        if first.1 < self.position {
+            if let Some((_start, end)) = self.highlights.iter().rev().find(|(_start, end)| self.position > *end) {
+                self.position = *end;
+            }
+        }
+        // loop over
+        else {
+            self.position = first.1;
+        }
+        self.update_cursor();
+    }
+
     // Tries to find and set a syntax
     pub fn find_syntax<'a>(&mut self, syntax_set: &'a SyntaxSet) -> Option<&'a SyntaxReference> {
         let name = self.name.clone()?;

@@ -24,29 +24,31 @@ impl utilities::Utility for FindModel {
    }
 
    fn update(&mut self, msg: Message) -> Option<Message> {
-       let old = self.entry.text.clone();
-       let msg = self.entry.update(msg);
+        let old = self.entry.text.clone();
+        let msg = self.entry.update(msg);
 
-       if self.entry.text != old && !self.entry.text.is_empty() {
-           return Some(Message::Find(self.entry.text.clone()))
-       }
+        if self.entry.text != old && !self.entry.text.is_empty() {
+            return Some(Message::Find(self.entry.text.clone()))
+        }
 
-       if msg.is_none() {
-           if self.entry.text != old && !self.entry.text.is_empty() {
-               return Some(Message::Find(self.entry.text.clone()))
-           } else {
-               return None
-           }
-       }
+        if msg.is_none() {
+            if self.entry.text != old && !self.entry.text.is_empty() {
+                return Some(Message::Find(self.entry.text.clone()))
+            } else {
+                return None
+            }
+        }
 
-       return match msg.unwrap() {
-           Message::OpenFind | Message::Enter => {
-               Some(Message::JumpNextHighlight)
-           },
-           // Message::MoveLeft => {
-           //     Some(Message::JumpPreviousHighlight)
-           // },
-           msg => Some(msg),
+        return match msg.unwrap() {
+            // I like this approach, but I could also make either of the movement directions
+            // close the utility.
+            Message::OpenFind | Message::Enter | Message::MoveRight | Message::MoveDown => {
+                Some(Message::JumpNextHighlight)
+            },
+            Message::MoveLeft | Message::MoveUp => {
+                Some(Message::JumpPreviousHighlight)
+            },
+            msg => Some(msg),
        }
    }
 }
