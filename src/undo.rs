@@ -1,5 +1,7 @@
 use std::time::{Duration, Instant};
 
+use tracing::trace;
+
 use crate::model::Message;
 
 const GROUP_TIME_SPAN: Duration = Duration::new(0, 500_000_000);
@@ -14,6 +16,22 @@ const GROUP_TIME_SPAN: Duration = Duration::new(0, 500_000_000);
  * All the do and undo commands require a position.
  */
 
+#[derive(Debug)]
+pub struct ReversableAction {
+    r#do: Message,
+    undo: Message,
+    position: usize,
+}
+
+impl ReversableAction {
+    pub fn r#do(&self) -> (Message, Message) {
+        (Message::JumpPosition(self.position), self.r#do.clone())
+    }
+    pub fn undo(&self) -> (Message, Message) {
+        (Message::JumpPosition(self.position), self.undo.clone())
+    }
+}
+
 /**
  A group of actions performed in a short time span that
  may be undo'd together.
@@ -23,27 +41,39 @@ const GROUP_TIME_SPAN: Duration = Duration::new(0, 500_000_000);
 #[derive(Debug)]
 struct UndoGroup {
     pub start_time: Instant,
-    pub messages: Vec<Message>,
-    pub inverse: Vec<Message>,
+    pub actions: Vec<ReversableAction>,
 }
 
 impl UndoGroup {
-    pub fn new(msg: Message, inverse: Message) -> Self {
-        let mut messages = vec![msg];
-        let mut inverse = vec![inverse];
-
+    pub fn new() -> Self {
         Self {
             start_time: Instant::now(),
-            messages,
-            inverse,
+            actions: vec![],
         }
     }
     pub fn still_valid(&self) -> bool {
         self.start_time.elapsed() < GROUP_TIME_SPAN
     }
-    pub fn push(&mut self, msg: Message, inverse: Message) {
-        self.messages.push(msg);
-        self.inverse.push(inverse);
+    pub fn push(&mut self, position: usize, msg: Message, inverse: Message) {
+        self.actions.push(ReversableAction { r#do: msg, undo: inverse, position });
+    }
+    pub fn r#do(&self) -> Vec<Message> {
+        let mut v = Vec::with_capacity(self.actions.len() * 2);
+        for action in &self.actions {
+            let (jump, msg) = action.r#do();
+            v.push(jump);
+            v.push(Message::InhibitUndo(Box::new(msg)));
+        }
+        v
+    }
+    pub fn undo(&self) -> Vec<Message> {
+        let mut v = Vec::with_capacity(self.actions.len() * 2);
+        for action in self.actions.iter().rev() {
+            let (jump, msg) = action.undo();
+            v.push(jump);
+            v.push(Message::InhibitUndo(Box::new(msg)));
+        }
+        v
     }
 }
 
@@ -52,35 +82,56 @@ pub struct UndoState {
     history: Vec<UndoGroup>,
     /// index of the next group
     index: usize,
+    /// if this is set to true, [UndoState::r#do] does nothing
+    pub inhibited: bool,
 }
 
 impl UndoState {
     pub fn new() -> Self {
         Self {
             history: vec![],
-            index: 0
+            index: 0,
+            inhibited: false,
         }
     }
-    pub fn r#do(&mut self, msg: Message, inverse: Message) {
+    pub fn r#do(&mut self, position: usize, msg: Message, inverse: Message) {
+        if self.inhibited {
+            return
+        }
+
         self.burn();
 
         // try to merge with last group
         if let Some(last) = self.previous_group() {
             if last.still_valid() {
-                last.push(msg, inverse);
+                last.push(position, msg, inverse);
                 return;
             }
         }
 
-        self.history.push(UndoGroup::new(msg, inverse));
+        let mut new_group = UndoGroup::new();
+        new_group.push(position, msg, inverse);
+        self.history.push(new_group);
         self.index += 1;
     }
 
     pub fn undo(&mut self) -> Vec<Message> {
-        if self.previous_group().is_some() {
-            let inverse_msgs = self.previous_group().unwrap().inverse.clone();
+        if let Some(prev) = self.previous_group() {
+            let msgs = prev.undo();
+            let _ = prev;
             self.index = self.index.saturating_sub(1);
-            return inverse_msgs.into_iter().rev().collect()
+            return msgs;
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn redo(&mut self) -> Vec<Message> {
+        if let Some(next) = self.next_group() {
+            let msgs = next.r#do();
+            let _ = next;
+            self.index += 1;
+            return msgs;
         } else {
             vec![]
         }
@@ -88,11 +139,19 @@ impl UndoState {
 
     /// remove any future redo's
     fn burn(&mut self) {
+        trace!("undo stack burned from {}", self.index);
         self.history.truncate(self.index);
     }
     fn previous_group(&mut self) -> Option<&mut UndoGroup> {
         if self.history.len() > 0 && self.index > 0 {
             Some(&mut self.history[self.index-1])
+        } else {
+            None
+        }
+    }
+    fn next_group(&mut self) -> Option<&mut UndoGroup> {
+        if self.history.len() >= self.index+1 {
+            Some(&mut self.history[self.index])
         } else {
             None
         }

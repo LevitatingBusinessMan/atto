@@ -91,10 +91,11 @@ impl Model {
 
             // Finally evaluate the message
             self.update_inner(msg);
+
+            trace!("{:?}", self.current_buffer().undo);
         }
     }
 
-    #[tracing::instrument(skip(self), level="debug")]
     fn update_inner(&mut self, msg: Message) {
         match msg {
             Message::NoMessage => {},
@@ -141,8 +142,9 @@ impl Model {
             Message::Escape => self.update(Message::CloseUtility),
             Message::CloseUtility => self.utility = None,
             Message::InsertChar(chr) => {
+                let pos = self.current_buffer().position;
+                self.current_buffer_mut().undo.r#do(pos, Message::InsertChar(chr), Message::UndoInsertChar);
                 self.current_buffer_mut().insert(chr);
-                self.current_buffer_mut().undo.r#do(Message::InsertChar(chr), Message::UndoInsertChar);
                 self.scroll_view();
             },
             Message::MoveLeft => {
@@ -172,12 +174,14 @@ impl Model {
                 // scroll_view = true;
             },
             Message::Backspace => {
+                let pos = self.current_buffer().position;
                 let removed = self.current_buffer_mut().backspace();
-                self.current_buffer_mut().undo.r#do(Message::Backspace, Message::UndoBackspace(removed));
+                self.current_buffer_mut().undo.r#do(pos, msg, Message::UndoBackspace(removed));
             },
             Message::Delete => {
+                let pos = self.current_buffer().position;
                 let removed = self.current_buffer_mut().delete();
-                self.current_buffer_mut().undo.r#do(Message::Delete, Message::UndoDelete(removed));
+                self.current_buffer_mut().undo.r#do(pos, msg, Message::UndoDelete(removed));
             },
             Message::JumpWordLeft => {
                 self.current_buffer_mut().move_word_left();
@@ -333,27 +337,42 @@ impl Model {
                 }
             },
             Message::UndoPaste(n) => {
-                todo!()
+                // TODO
             },
             Message::UndoBackspace(grapheme)  => {
+                self.current_buffer_mut().position -= grapheme.len();
                 self.current_buffer_mut().paste(&grapheme);
+                self.scroll_view();
             },
             Message::UndoDelete(grapheme) => {
                 self.current_buffer_mut().insert_str(&grapheme);
+                self.scroll_view();
             },
             Message::UndoInsertChar => {
-                self.current_buffer_mut().backspace();
+                self.current_buffer_mut().delete();
             },
             Message::Redo => {
-
+                let msgs = self.current_buffer_mut().undo.redo();
+                self.update(Message::Many(msgs));
             },
             Message::Undo => {
-                //next_msg = Some(Message::Many(self.current_buffer_mut().undo.undo()));
+                let msgs = self.current_buffer_mut().undo.undo();
+                self.update(Message::Many(msgs));
             },
             Message::Many(msgs) => {
                 for msg in msgs {
                     self.update(msg)
                 }
+            },
+            Message::JumpPosition(position) => {
+                self.current_buffer_mut().position = position;
+                self.current_buffer_mut().update_cursor();
+                self.center_view();
+            },
+            Message::InhibitUndo(msg) => {
+              self.current_buffer_mut().undo.inhibited = true;
+              self.update(*msg);
+              self.current_buffer_mut().undo.inhibited = false;
             },
         };
     }
@@ -370,6 +389,7 @@ impl Model {
         return &self.theme_set.themes[&self.theme]
     }
 
+    /// scrolls the current buffer so that the cursor is visible
     fn scroll_view(&mut self) {
         let layout = self.layout();
         let cursor_y = self.current_buffer().cursor.y;
@@ -382,6 +402,7 @@ impl Model {
         }
     }
 
+    /// centers the view (on the current buffer)
     fn center_view(&mut self) {
         let layout = self.layout();
         let half_height = layout.buffer.height / 2;
@@ -450,4 +471,9 @@ pub enum Message {
     Undo,
     Redo,
     Many(Vec<Message>),
+    /// jump to a byte position
+    JumpPosition(usize),
+    /// run a message while the active buffer's undo is inhibited.
+    /// when using this make sure not to use a message that switches the buffer
+    InhibitUndo(Box<Message>),
 }
