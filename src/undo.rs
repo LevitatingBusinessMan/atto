@@ -4,13 +4,14 @@ use crate::model::Message;
 
 const GROUP_TIME_SPAN: Duration = Duration::new(0, 500_000_000);
 
-/*
+/**
  * NOTES
- * I did this the wrong way, if each group is a connected set of actions
- * we can always merge it into a single one.
  *
- * Either a variant of adding without moving the cursor, adding with moving the cursor.
- * Or removing ahead or backwards.
+ * For undo it is useful to be able to execute many messages to the model with ease.
+ * That's why I think it might be useful to have a Message:Many message.
+ * I could also then split the update function to have an inner version which doesn't do the view related work.
+ *
+ * All the do and undo commands require a position.
  */
 
 /**
@@ -27,13 +28,9 @@ struct UndoGroup {
 }
 
 impl UndoGroup {
-    pub fn new(msg: Message, removed: Option<String>) -> Self {
-        let mut messages = vec![];
-        let mut inverse = vec![];
-        if let Some(inverse_) = invert(&msg, removed) {
-            messages.push(msg);
-            inverse.push(inverse_);
-        }
+    pub fn new(msg: Message, inverse: Message) -> Self {
+        let mut messages = vec![msg];
+        let mut inverse = vec![inverse];
 
         Self {
             start_time: Instant::now(),
@@ -44,11 +41,9 @@ impl UndoGroup {
     pub fn still_valid(&self) -> bool {
         self.start_time.elapsed() < GROUP_TIME_SPAN
     }
-    pub fn push(&mut self, msg: Message, removed: Option<String>) {
-        if let Some(inverse) = invert(&msg, removed) {
-            self.messages.push(msg);
-            self.inverse.push(inverse);
-        }
+    pub fn push(&mut self, msg: Message, inverse: Message) {
+        self.messages.push(msg);
+        self.inverse.push(inverse);
     }
 }
 
@@ -66,32 +61,31 @@ impl UndoState {
             index: 0
         }
     }
-    pub fn r#do(&mut self, msg: Message, removed: Option<String>) {
-        if !has_inverse(&msg) {
-            return;
-        }
-
+    pub fn r#do(&mut self, msg: Message, inverse: Message) {
         self.burn();
 
         // try to merge with last group
         if let Some(last) = self.previous_group() {
             if last.still_valid() {
-                last.push(msg, removed);
+                last.push(msg, inverse);
                 return;
             }
         }
 
-        self.history.push(UndoGroup::new(msg, removed));
+        self.history.push(UndoGroup::new(msg, inverse));
         self.index += 1;
     }
-    pub fn redo(&mut self) -> Vec<Message> {
+
+    pub fn undo(&mut self) -> Vec<Message> {
         if self.previous_group().is_some() {
+            let inverse_msgs = self.previous_group().unwrap().inverse.clone();
             self.index = self.index.saturating_sub(1);
-            return self.previous_group().unwrap().inverse.clone();
+            return inverse_msgs.into_iter().rev().collect()
         } else {
             vec![]
         }
     }
+
     /// remove any future redo's
     fn burn(&mut self) {
         self.history.truncate(self.index);
@@ -105,16 +99,16 @@ impl UndoState {
     }
 }
 
-fn invert(msg: &Message, removed: Option<String>) -> Option<Message> {
-    match msg {
-        Message::InsertChar(_) => Some(Message::UndoInsertChar),
-        Message::Backspace => Some(Message::UndoBackspace(removed.unwrap())),
-        Message::Delete => Some(Message::UndoDelete(removed.unwrap())),
-        Message::Paste(paste) => Some(Message::UndoPaste(paste.len())),
-        _ => None,
-    }
-}
+// fn invert(msg: &Message, removed: Option<String>) -> Option<Message> {
+//     match msg {
+//         Message::InsertChar(_) => Some(Message::UndoInsertChar),
+//         Message::Backspace => Some(Message::UndoBackspace(removed.unwrap())),
+//         Message::Delete => Some(Message::UndoDelete(removed.unwrap())),
+//         Message::Paste(paste) => Some(Message::UndoPaste(paste.len())),
+//         _ => None,
+//     }
+// }
 
-fn has_inverse(msg: &Message) -> bool {
-    matches!(msg, Message::Backspace | Message::Delete | Message::InsertChar(_) | Message::Paste(_))
-}
+// fn has_inverse(msg: &Message) -> bool {
+//     matches!(msg, Message::Backspace | Message::Delete | Message::InsertChar(_) | Message::Paste(_))
+// }

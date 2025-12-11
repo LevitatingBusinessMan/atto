@@ -140,7 +140,7 @@ impl Model {
             Message::CloseUtility => self.utility = None,
             Message::InsertChar(chr) => {
                 self.current_buffer_mut().insert(chr);
-                self.current_buffer_mut().undo.r#do(Message::InsertChar(chr), None);
+                self.current_buffer_mut().undo.r#do(Message::InsertChar(chr), Message::UndoInsertChar);
                 scroll_view = true;
             },
             Message::MoveLeft => {
@@ -171,11 +171,11 @@ impl Model {
             },
             Message::Backspace => {
                 let removed = self.current_buffer_mut().backspace();
-                self.current_buffer_mut().undo.r#do(Message::Backspace, Some(removed));
+                self.current_buffer_mut().undo.r#do(Message::Backspace, Message::UndoBackspace(removed));
             },
             Message::Delete => {
                 let removed = self.current_buffer_mut().delete();
-                self.current_buffer_mut().undo.r#do(Message::Delete, Some(removed));
+                self.current_buffer_mut().undo.r#do(Message::Delete, Message::UndoDelete(removed));
             },
             Message::JumpWordLeft => {
                 self.current_buffer_mut().move_word_left();
@@ -336,13 +336,20 @@ impl Model {
                 self.current_buffer_mut().insert_str(&grapheme);
             },
             Message::UndoInsertChar => {
-                self.current_buffer_mut().delete();
+                self.current_buffer_mut().backspace();
             },
             Message::Redo => {
-                todo!()
+
             },
             Message::Undo => {
-                todo!()
+                //next_msg = Some(Message::Many(self.current_buffer_mut().undo.undo()));
+            },
+            Message::Many(msgs) => {
+              for mut msg in msgs {
+                  while let Some(new) = self.update(msg) {
+                      msg  = new;
+                  }
+              }
             },
         };
 
@@ -450,4 +457,5 @@ pub enum Message {
     UndoInsertChar,
     Undo,
     Redo,
+    Many(Vec<Message>)
 }
