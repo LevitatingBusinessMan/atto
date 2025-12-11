@@ -104,6 +104,10 @@ impl Model {
                     Ok(true) => {
                         if matches!(self.utility, Some(UtilityWindow::SaveAs(_))) {
                             // ignore quit if save as window is open
+                            // this is more of a work around
+                            // a permanent solution could include variants like SaveQuit, SaveAsQuit and SaveAsRootQuit
+                            // messages instead of using a Save + Quit Double
+                            // The problem with the Save + Quit double is that when the save files quit is still executed
                             debug!("ignoring quit message, save as utility is open");
                         } else {
                             self.utility = Some(UtilityWindow::Confirm(
