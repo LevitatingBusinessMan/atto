@@ -1,6 +1,6 @@
 [package]
 name = "atto"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 description = "An experimental terminal text editor"
 license = "MIT"
