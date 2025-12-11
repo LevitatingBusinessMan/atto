@@ -26,6 +26,8 @@ pub struct Model {
     pub show_whitespace: bool,
     /// is mouse_capture enabled
     pub mouse_capture: bool,
+    /// did the last message cause an error
+    pub last_error: bool,
 }
 
 impl Model {
@@ -54,11 +56,12 @@ impl Model {
             notification: None,
             show_whitespace: false,
             mouse_capture: true,
+            last_error: false,
         }
     }
 
     #[tracing::instrument(skip(self), level="debug")]
-    pub fn update(&mut self, msg: Message) -> Option<Message> {
+    pub fn update(&mut self, msg: Message) {
         // remove notification if elapsed
         // (the handling of this makes it so that if the user does not somehow create a message)
         // the notification will hang around
@@ -79,7 +82,7 @@ impl Model {
         };
 
         if new_msg.is_none() {
-            return None;
+            return
         }
 
         let msg = new_msg.unwrap();
@@ -87,11 +90,6 @@ impl Model {
         if self.utility.is_some() {
             debug!("Utility {:?} returned {:?}", &self.utility.as_ref().unwrap(), &msg);
         }
-
-        // If the view should be altered
-        let mut scroll_view = false;
-        let mut center_view = false;
-        let mut next_msg = None;
 
         // Finally evaluate the message
         match msg {
@@ -136,28 +134,28 @@ impl Model {
             Message::ScrollUp => self.current_buffer_mut().top = self.current_buffer_mut().top.saturating_sub(2),
             Message::OpenHelp => self.utility = Some(UtilityWindow::Help(utilities::help::HelpModel())),
             Message::OpenFind => self.utility = Some(UtilityWindow::Find(utilities::find::FindModel::new())),
-            Message::Escape => next_msg = Some(Message::CloseUtility),
+            Message::Escape => self.update(Message::CloseUtility),
             Message::CloseUtility => self.utility = None,
             Message::InsertChar(chr) => {
                 self.current_buffer_mut().insert(chr);
                 self.current_buffer_mut().undo.r#do(Message::InsertChar(chr), Message::UndoInsertChar);
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::MoveLeft => {
                 self.current_buffer_mut().move_left();
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::MoveRight => {
                 self.current_buffer_mut().move_right();
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::MoveUp => {
                 self.current_buffer_mut().move_up();
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::MoveDown => {
                 self.current_buffer_mut().move_down();
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::PageUp => {
                 let height = self.viewport.height as usize;
@@ -179,36 +177,35 @@ impl Model {
             },
             Message::JumpWordLeft => {
                 self.current_buffer_mut().move_word_left();
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::JumpWordRight => {
                 self.current_buffer_mut().move_word_right();
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::GotoStartOfLine => self.current_buffer_mut().goto_start_of_line(),
             Message::GotoEndOfLine => self.current_buffer_mut().goto_end_of_line(),
-            Message::Enter => next_msg = Some(Message::InsertChar('\n')),
+            Message::Enter => self.update(Message::InsertChar('\n')),
             Message::Find(query) => {
                 let occurences = self.current_buffer_mut().highlight(query);
                 // if the find utility is open, set the occurences
                 if let Some(UtilityWindow::Find(find)) = &mut self.utility {
                     find.occurences = Some(occurences);
                 }
-               next_msg = Some(Message::JumpNextHighlight);
+               self.update(Message::JumpNextHighlight);
             },
             Message::Save => {
                 if self.current_buffer().name.is_none() {
                     self.utility = Some(UtilityWindow::SaveAs(SaveAsModel::new()));
-                    next_msg = None
                 } else {
                     if let Err(e) = self.current_buffer_mut().save() {
                         tracing::warn!("{:?}", e);
-                        next_msg = Some(Message::Notification(
+                        self.update(Message::Notification(
                             format!("Error writing file: {e}"),
                             Style::new().bg(Color::Red).fg(Color::White)
                         ));
                     } else {
-                        next_msg = Some(Message::Notification(
+                        self.update(Message::Notification(
                             String::from("SAVED"),
                             Style::new().bg(Color::Green).fg(Color::Black)
                         ));
@@ -218,12 +215,12 @@ impl Model {
             Message::SaveAsRoot => {
                 if let Err(e) = self.current_buffer_mut().save_as_root() {
                     tracing::error!("Error saving as root: {e:?}");
-                    next_msg = Some(Message::Notification(
+                    self.update(Message::Notification(
                         format!("Error saving as root: {e}"),
                         Style::new().bg(Color::Red).fg(Color::White)
                     ));
                 } else {
-                    next_msg = Some(Message::Notification(
+                    self.update(Message::Notification(
                         String::from("SAVED AS ROOT"),
                         Style::new().bg(Color::Yellow).fg(Color::Black)
                     ));
@@ -244,10 +241,9 @@ impl Model {
             Message::Paste(paste) => self.current_buffer_mut().paste(&paste),
             Message::OpenShell => self.utility = Some(utilities::UtilityWindow::Shell(utilities::shell::ShellModel::new())),
             Message::Double(first, second) => {
-                if let Some(msg) = self.update(*first) {
-                    next_msg = Some(Message::Double(Box::new(msg), Box::new(*second)));
-                } else {
-                    next_msg = Some(*second);
+                self.update(*first);
+                if !self.last_error {
+                    self.update(*second);
                 }
             },
             Message::SaveAsRootConfirmation => {
@@ -262,22 +258,22 @@ impl Model {
             },
             Message::ToBottom => {
                 self.current_buffer_mut().to_bottom();
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::ToTop => {
                 self.current_buffer_mut().to_top();
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::Tab => {
                 self.current_buffer_mut().insert('\t');
-                scroll_view = true;
+                self.scroll_view();
             },
             Message::Suspend => match crate::suspend::suspend().log() {
                 Ok(_) => {},
                 Err(e) => {
                     let _ = crate::tui::setup();
                     let _ = crate::TERMINAL.get().unwrap().lock().unwrap().clear();
-                    next_msg = Some(Message::Notification(
+                    self.update(Message::Notification(
                         format!("Suspendin failed with {:?}", e),
                         Style::new().bg(Color::Red).fg(Color::White)
                     ))
@@ -299,18 +295,18 @@ impl Model {
             Message::DragMouseLeft => {},
             Message::JumpNextHighlight => {
                 self.current_buffer_mut().jump_next_highlight();
-                center_view = true;
+                self.center_view();
             },
             Message::JumpPreviousHighlight => {
                 self.current_buffer_mut().jump_previous_highlight();
-                center_view = true;
+                self.center_view();
             },
             Message::SaveAs(path) => {
                 let old = self.current_buffer().name.clone();
                 self.current_buffer_mut().name = Some(path);
                 match self.current_buffer_mut().save() {
                     Ok(()) => {
-                        next_msg = Some(Message::Notification(
+                        self.update(Message::Notification(
                             String::from("SAVED"),
                             Style::new().bg(Color::Green).fg(Color::Black)
                         ));
@@ -319,7 +315,7 @@ impl Model {
                         // revert old name/path
                         self.current_buffer_mut().name = old;
                         tracing::warn!("{:?}", e);
-                        next_msg = Some(Message::Notification(
+                        self.update(Message::Notification(
                             format!("Error writing file: {e}"),
                             Style::new().bg(Color::Red).fg(Color::White)
                         ));
@@ -345,25 +341,11 @@ impl Model {
                 //next_msg = Some(Message::Many(self.current_buffer_mut().undo.undo()));
             },
             Message::Many(msgs) => {
-              for mut msg in msgs {
-                  while let Some(new) = self.update(msg) {
-                      msg  = new;
-                  }
-              }
+                for msg in msgs {
+                    self.update(msg)
+                }
             },
         };
-
-        if center_view {
-            self.center_view();
-        }
-
-        if scroll_view {
-            self.scroll_view();
-        }
-
-        trace!("{:?}", self.current_buffer().undo);
-
-        next_msg
     }
 
     pub fn current_buffer_mut(&mut self) -> &mut Buffer {

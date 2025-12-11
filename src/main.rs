@@ -78,9 +78,8 @@ fn main() -> anyhow::Result<()> {
     terminal.draw(|frame| model.view(frame))?;
     TERMINAL.set(Mutex::new(terminal)).unwrap();
     while model.running {
-        let mut msg = handle_event(&model, &mut event_state)?;
-        while msg.is_some() {
-            msg = model.update(msg.unwrap());
+        if let Some(msg) = handle_event(&model, &mut event_state)? {
+            model.update(msg);
             TERMINAL.get().unwrap().lock().unwrap().draw(|frame| model.view(frame))?;
         }
     }
