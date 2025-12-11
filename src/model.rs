@@ -1,11 +1,11 @@
-use std::io::stdout;
+use std::{io::stdout, rc::Rc};
 
 use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
 use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error, trace};
 
-use crate::{buffer::{self, Buffer}, logging::LogError, utilities::{self, Utility, UtilityWindow, developer::DeveloperModel, save_as::SaveAsModel}};
+use crate::{buffer::{self, Buffer}, logging::LogError, undo::UndoState, utilities::{self, Utility, UtilityWindow, developer::DeveloperModel, save_as::SaveAsModel}};
 use crate::notification::Notification;
 
 pub struct Model {
@@ -131,6 +131,7 @@ impl Model {
             Message::CloseUtility => self.utility = None,
             Message::InsertChar(chr) => {
                 self.current_buffer_mut().insert(chr);
+                self.current_buffer_mut().undo.r#do(Message::InsertChar(chr), None);
                 scroll_view = true;
             },
             Message::MoveLeft => {
@@ -159,8 +160,14 @@ impl Model {
                 self.current_buffer_mut().page_down(height);
                 // scroll_view = true;
             },
-            Message::Backspace => self.current_buffer_mut().backspace(),
-            Message::Delete => self.current_buffer_mut().delete(),
+            Message::Backspace => {
+                let removed = self.current_buffer_mut().backspace();
+                self.current_buffer_mut().undo.r#do(Message::Backspace, Some(removed));
+            },
+            Message::Delete => {
+                let removed = self.current_buffer_mut().delete();
+                self.current_buffer_mut().undo.r#do(Message::Delete, Some(removed));
+            },
             Message::JumpWordLeft => {
                 self.current_buffer_mut().move_word_left();
                 scroll_view = true;
@@ -184,18 +191,19 @@ impl Model {
                 if self.current_buffer().name.is_none() {
                     self.utility = Some(UtilityWindow::SaveAs(SaveAsModel::new()));
                     next_msg = None
-                }
-                if let Err(e) = self.current_buffer_mut().save() {
-                    tracing::warn!("{:?}", e);
-                    next_msg = Some(Message::Notification(
-                        format!("Error writing file: {e}"),
-                        Style::new().bg(Color::Red).fg(Color::White)
-                    ));
                 } else {
-                    next_msg = Some(Message::Notification(
-                        String::from("SAVED"),
-                        Style::new().bg(Color::Green).fg(Color::Black)
-                    ));
+                    if let Err(e) = self.current_buffer_mut().save() {
+                        tracing::warn!("{:?}", e);
+                        next_msg = Some(Message::Notification(
+                            format!("Error writing file: {e}"),
+                            Style::new().bg(Color::Red).fg(Color::White)
+                        ));
+                    } else {
+                        next_msg = Some(Message::Notification(
+                            String::from("SAVED"),
+                            Style::new().bg(Color::Green).fg(Color::Black)
+                        ));
+                    }
                 }
             },
             Message::SaveAsRoot => {
@@ -306,6 +314,24 @@ impl Model {
                     }
                 }
             },
+            Message::UndoPaste(n) => {
+                todo!()
+            },
+            Message::UndoBackspace(grapheme)  => {
+                self.current_buffer_mut().paste(&grapheme);
+            },
+            Message::UndoDelete(grapheme) => {
+                self.current_buffer_mut().insert_str(&grapheme);
+            },
+            Message::UndoInsertChar => {
+                self.current_buffer_mut().delete();
+            },
+            Message::Redo => {
+                todo!()
+            },
+            Message::Undo => {
+                todo!()
+            },
         };
 
         if center_view {
@@ -315,6 +341,8 @@ impl Model {
         if scroll_view {
             self.scroll_view();
         }
+
+        trace!("{:?}", self.current_buffer().undo);
 
         next_msg
     }
@@ -403,4 +431,11 @@ pub enum Message {
     JumpPreviousHighlight,
     // save under the following name, updating the buffer path
     SaveAs(String),
+    // buffer action to undo a paste, removing x graphemes
+    UndoPaste(usize),
+    UndoBackspace(String),
+    UndoDelete(String),
+    UndoInsertChar,
+    Undo,
+    Redo,
 }

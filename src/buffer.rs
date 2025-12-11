@@ -5,7 +5,7 @@ use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use unicode_width::UnicodeWidthStr;
 use which::which;
 
-use crate::{logging::LogError, parse::{perform_str_replacements, CachedParseState, ParseCacheTrait}};
+use crate::{logging::LogError, parse::{CachedParseState, ParseCacheTrait, perform_str_replacements}, undo::UndoState};
 
 pub static PRIVESC_CMD: LazyLock<&'static str> = LazyLock::new(|| {
     let cmds = vec!["run0", "sudo", "doas"];
@@ -17,7 +17,7 @@ pub static PRIVESC_CMD: LazyLock<&'static str> = LazyLock::new(|| {
     return "sudo";
 });
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Buffer {
     /// used as the path
     pub name: Option<String>,
@@ -43,6 +43,7 @@ pub struct Buffer {
     /// start and end positions of highlgihts
     pub highlights: Vec<(usize, usize)>,
     pub dirty: bool,
+    pub undo: UndoState,
 }
 
 fn generate_linestarts(content: &str) -> Vec<usize> {
@@ -110,6 +111,7 @@ impl Buffer {
             syntax: None,
             highlights: vec![],
             dirty: false,
+            undo: UndoState::new(),
         }
     }
 
@@ -129,6 +131,7 @@ impl Buffer {
             syntax: None,
             highlights: vec![],
             dirty: true,
+            undo: UndoState::new(),
         }
     }
 
@@ -605,28 +608,43 @@ impl Buffer {
         self.parse_cache.borrow_mut().invalidate_from(self.top);
     }
 
-    pub fn paste(&mut self, content: &str) {
-        self.prefered_col = None;
+    /// insert a string without moving the cursor
+    pub fn insert_str(&mut self, content: &str) {
         self.content.insert_str(self.position, content);
-        self.position += content.len();
         self.linestarts = generate_linestarts(&self.content);
     }
 
-    pub fn backspace(&mut self) {
-        if let Some((s, b)) = self.prev_grapheme() {
-            self.content.drain(b..self.position);
+    /// like [insert_str] but moves the cursor
+    pub fn paste(&mut self, content: &str) {
+        self.prefered_col = None;
+        self.insert_str(content);
+        self.position += content.len();
+        self.update_cursor();
+    }
+
+    /// Delete previous grapheme, returns removed grapheme
+    pub fn backspace(&mut self) -> String {
+        if let Some((_s, b)) = self.prev_grapheme() {
+            let removed = self.content.drain(b..self.position).collect();
             self.position = b;
             self.prefered_col = None;
             self.linestarts = generate_linestarts(&self.content);
             self.update_cursor();
+            removed
+        } else {
+            String::new()
         }
     }
 
-    pub fn delete(&mut self) {
+    /// Delete grapheme at cursor, returns removed grapheme
+    pub fn delete(&mut self) -> String {
         if let Some((_s, b)) = self.cur_grapheme() {
-            self.content.drain(self.position..b);
+            let removed = self.content.drain(self.position..b).collect();
             self.linestarts = generate_linestarts(&self.content);
             self.update_cursor();
+            removed
+        } else {
+            String::new()
         }
     }
 

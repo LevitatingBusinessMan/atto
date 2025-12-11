@@ -1,4 +1,4 @@
-use std::time;
+use std::{rc::Rc, time};
 
 use anyhow::Ok;
 use crossterm::event::{self, KeyCode, KeyModifiers, MouseButton};
@@ -117,6 +117,8 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Char('f') => Some(Message::OpenFind),
                 KeyCode::Char('b') => Some(Message::OpenShell),
                 KeyCode::Char('z') => Some(Message::Suspend),
+                KeyCode::Char('u') => Some(Message::Undo),
+                KeyCode::Char('y') => Some(Message::Redo),
                 _ => None,
             }
         } else {
