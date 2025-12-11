@@ -28,8 +28,8 @@ impl utilities::Utility for SaveAsModel {
                 Message::Enter => {
                     if !self.entry.text.is_empty() {
                         Some(Message::Double(
+                            Box::new(Message::SaveAs(self.entry.text.clone())),
                             Box::new(Message::CloseUtility),
-                            Box::new(Message::SaveAs(self.entry.text.clone()))
                         ))
                     } else {
                         None

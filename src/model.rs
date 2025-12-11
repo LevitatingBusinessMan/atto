@@ -3,7 +3,7 @@ use std::{io::stdout, rc::Rc};
 use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
 use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
-use tracing::{debug, error, trace};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{buffer::{self, Buffer}, logging::LogError, undo::UndoState, utilities::{self, Utility, UtilityWindow, developer::DeveloperModel, save_as::SaveAsModel}};
 use crate::notification::Notification;
@@ -71,7 +71,7 @@ impl Model {
             }
         }
 
-        let new_msg = match &mut self.utility {
+        let msg = match &mut self.utility {
             Some(UtilityWindow::Find(find)) => find.update(msg),
             Some(UtilityWindow::Help(help)) => help.update(msg),
             Some(UtilityWindow::Confirm(confirm)) => confirm.update(msg),
@@ -81,17 +81,21 @@ impl Model {
             None => Some(msg),
         };
 
-        if new_msg.is_none() {
-            return
+        if let Some(msg) = msg {
+            if self.utility.is_some() {
+                debug!("Utility {:?} returned {:?}", &self.utility.as_ref().unwrap(), &msg);
+            }
+
+            // by default report success
+            self.last_error = false;
+
+            // Finally evaluate the message
+            self.update_inner(msg);
         }
+    }
 
-        let msg = new_msg.unwrap();
-
-        if self.utility.is_some() {
-            debug!("Utility {:?} returned {:?}", &self.utility.as_ref().unwrap(), &msg);
-        }
-
-        // Finally evaluate the message
+    #[tracing::instrument(skip(self), level="debug")]
+    fn update_inner(&mut self, msg: Message) {
         match msg {
             Message::NoMessage => {},
             Message::NextBuffer => self.selected = (self.selected + 1) % self.buffers.len(),
@@ -204,6 +208,7 @@ impl Model {
                             format!("Error writing file: {e}"),
                             Style::new().bg(Color::Red).fg(Color::White)
                         ));
+                        self.last_error = true;
                     } else {
                         self.update(Message::Notification(
                             String::from("SAVED"),
@@ -214,11 +219,12 @@ impl Model {
             },
             Message::SaveAsRoot => {
                 if let Err(e) = self.current_buffer_mut().save_as_root() {
-                    tracing::error!("Error saving as root: {e:?}");
+                    tracing::warn!("Error saving as root: {e:?}");
                     self.update(Message::Notification(
                         format!("Error saving as root: {e}"),
                         Style::new().bg(Color::Red).fg(Color::White)
                     ));
+                    self.last_error = true;
                 } else {
                     self.update(Message::Notification(
                         String::from("SAVED AS ROOT"),
@@ -243,7 +249,10 @@ impl Model {
             Message::Double(first, second) => {
                 self.update(*first);
                 if !self.last_error {
+                    info!("yes {:?}", second);
                     self.update(*second);
+                } else {
+                    warn!("not executing {:?} due to previous error", second);
                 }
             },
             Message::SaveAsRootConfirmation => {
@@ -303,11 +312,11 @@ impl Model {
             },
             Message::SaveAs(path) => {
                 let old = self.current_buffer().name.clone();
-                self.current_buffer_mut().name = Some(path);
+                self.current_buffer_mut().name = Some(path.clone());
                 match self.current_buffer_mut().save() {
                     Ok(()) => {
                         self.update(Message::Notification(
-                            String::from("SAVED"),
+                            format!("SAVED AS {}", path),
                             Style::new().bg(Color::Green).fg(Color::Black)
                         ));
                     },
@@ -319,6 +328,7 @@ impl Model {
                             format!("Error writing file: {e}"),
                             Style::new().bg(Color::Red).fg(Color::White)
                         ));
+                        self.last_error = true;
                     }
                 }
             },
@@ -439,5 +449,5 @@ pub enum Message {
     UndoInsertChar,
     Undo,
     Redo,
-    Many(Vec<Message>)
+    Many(Vec<Message>),
 }

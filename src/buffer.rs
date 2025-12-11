@@ -590,7 +590,6 @@ impl Buffer {
                 Ok(filecontent != self.content)
             },
             None => {
-                trace!("{}", self.content.is_empty());
                 Ok(!self.content.is_empty())
             },
         }
