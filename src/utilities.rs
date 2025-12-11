@@ -3,6 +3,9 @@ pub mod find;
 pub mod confirm;
 pub mod developer;
 pub mod shell;
+pub mod save_as;
+
+use std::fmt::Debug;
 
 use ratatui::{Frame, layout::Rect, style::{Style, Stylize}, widgets::{Block, Borders, Paragraph}};
 
@@ -52,4 +55,44 @@ pub enum UtilityWindow {
     Confirm(confirm::ConfirmModel),
     Developer(developer::DeveloperModel),
     Shell(shell::ShellModel),
+    SaveAs(save_as::SaveAsModel),
+}
+
+impl Debug for UtilityWindow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Help(_arg0) => f.debug_tuple("Help").finish(),
+            Self::Find(_arg0) => f.debug_tuple("Find").finish(),
+            Self::Confirm(_arg0) => f.debug_tuple("Confirm").finish(),
+            Self::Developer(_arg0) => f.debug_tuple("Developer").finish(),
+            Self::Shell(_arg0) => f.debug_tuple("Shell").finish(),
+            Self::SaveAs(_arg0) => f.debug_tuple("SaveAs").finish(),
+        }
+    }
+}
+
+/// Abstracts the state of an entry like widget,
+/// it provides keyboard shortcuts to any (singline) buffer
+#[derive(Clone)]
+struct EntryModel {
+    pub text: String,
+}
+
+impl EntryModel {
+    pub fn new() -> Self {
+        Self { text: String::new() }
+    }
+    pub fn update(&mut self, msg: Message) -> Option<Message> {
+        match msg {
+            Message::InsertChar(c) => {
+                self.text.push(c);
+                None
+            },
+            Message::Backspace => {
+                self.text.pop();
+                None
+            }
+            msg => Some(msg),
+        }
+    }
 }

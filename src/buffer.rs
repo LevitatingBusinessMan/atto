@@ -19,6 +19,7 @@ pub static PRIVESC_CMD: LazyLock<&'static str> = LazyLock::new(|| {
 
 #[derive(Clone, Debug)]
 pub struct Buffer {
+    /// used as the path
     pub name: Option<String>,
     pub content: String,
     pub file: Option<Arc<Mutex<File>>>,
@@ -565,7 +566,10 @@ impl Buffer {
                 file.read_to_string(&mut filecontent)?;
                 Ok(filecontent != self.content)
             },
-            None => Ok(true),
+            None => {
+                trace!("{}", self.content.is_empty());
+                Ok(!self.content.is_empty())
+            },
         }
     }
 

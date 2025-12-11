@@ -5,7 +5,7 @@ use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error};
 
-use crate::{buffer::{self, Buffer}, logging::LogError, utilities::{self, developer::DeveloperModel, Utility, UtilityWindow}};
+use crate::{buffer::{self, Buffer}, logging::LogError, utilities::{self, Utility, UtilityWindow, developer::DeveloperModel, save_as::SaveAsModel}};
 use crate::notification::Notification;
 
 pub struct Model {
@@ -81,16 +81,19 @@ impl Model {
             Some(UtilityWindow::Confirm(confirm)) => confirm.update(msg),
             Some(UtilityWindow::Developer(developer)) => developer.update(msg),
             Some(UtilityWindow::Shell(shell)) => shell.update(msg),
+            Some(UtilityWindow::SaveAs(save_as)) => save_as.update(msg),
             None => Some(msg),
         };
 
         if new_msg.is_none() {
-            return None
-        } else {
-            debug!("Utility returned {:?}", &new_msg.as_ref().unwrap());
+            return None;
         }
 
         let msg = new_msg.unwrap();
+
+        if self.utility.is_some() {
+            debug!("Utility {:?} returned {:?}", &self.utility.as_ref().unwrap(), &msg);
+        }
 
         match msg {
             Message::NoMessage => {},
@@ -180,7 +183,11 @@ impl Model {
                 self.may_scroll = true;
             },
             Message::Save => {
-                if let Err(e) =  self.current_buffer_mut().save() {
+                if self.current_buffer().name.is_none() {
+                    self.utility = Some(UtilityWindow::SaveAs(SaveAsModel::new()));
+                    return None
+                }
+                if let Err(e) = self.current_buffer_mut().save() {
                     tracing::warn!("{:?}", e);
                     return Some(Message::Notification(
                         format!("Error writing file: {e}"),
@@ -275,7 +282,28 @@ impl Model {
             Message::JumpNextHighlight => {
                 self.current_buffer_mut().jump_next_highlight();
                 self.may_scroll = true;
-            }
+            },
+            Message::SaveAs(path) => {
+                let old = self.current_buffer().name.clone();
+                self.current_buffer_mut().name = Some(path);
+                match self.current_buffer_mut().save() {
+                    Ok(()) => {
+                        return Some(Message::Notification(
+                            String::from("SAVED"),
+                            Style::new().bg(Color::Green).fg(Color::Black)
+                        ));
+                    },
+                    Err(e) => {
+                        // revert old name/path
+                        self.current_buffer_mut().name = old;
+                        tracing::warn!("{:?}", e);
+                        return Some(Message::Notification(
+                            format!("Error writing file: {e}"),
+                            Style::new().bg(Color::Red).fg(Color::White)
+                        ));
+                    }
+                }
+            },
         }
         None
     }
@@ -343,4 +371,6 @@ pub enum Message {
     ToggleMouseCapture,
     DragMouseLeft,
     JumpNextHighlight,
+    // save under the following name, updating the buffer path
+    SaveAs(String),
 }

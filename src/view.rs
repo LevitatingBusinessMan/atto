@@ -50,10 +50,9 @@ impl View for Model {
             let current_buffer = self.current_buffer_mut();
             trace!("may_scroll: {may_scroll}");
             if may_scroll {
-                tracing::debug!("CROLL");
                 if cursor_y < current_buffer.top {
                     current_buffer.top = cursor_y as usize;
-                } else if cursor_y >= current_buffer.top + buffer_and_scrollbar[0].height as usize{
+                } else if cursor_y >= current_buffer.top + buffer_and_scrollbar[0].height as usize {
                     let diff = cursor_y - (current_buffer.top + buffer_and_scrollbar[0].height as usize);
                     current_buffer.top += diff as usize + 1;
                 }
@@ -128,6 +127,7 @@ impl View for Model {
             Some(UtilityWindow::Confirm(confirm)) => confirm.view(f, utility_area),
             Some(UtilityWindow::Developer(developer)) => developer.view(f, utility_area),
             Some(UtilityWindow::Shell(shell)) => shell.view(f, utility_area),
+            Some(UtilityWindow::SaveAs(save_as)) => save_as.view(f, utility_area),
             None => {},
         }
 

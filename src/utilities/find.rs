@@ -4,14 +4,14 @@ use tracing::trace;
 use crate::{model::{Message, Model}, utilities};
 
 pub struct FindModel {
-    pub entry: String,
+    pub entry: super::EntryModel,
     pub occurences: Option<usize>,
 }
 
 impl FindModel {
     pub fn new() -> Self {
         Self {
-            entry: String::new(),
+            entry: super::EntryModel::new(),
             occurences: None
         }
     }
@@ -20,28 +20,29 @@ impl FindModel {
 impl utilities::Utility for FindModel {
     fn view(&self, f: &mut Frame, area: Rect) {
         let title = format!("Find ({})", self.occurences.unwrap_or(0));
-        super::default_view(&title, &self.entry, f, area);
+        super::default_view(&title, &self.entry.text, f, area);
    }
 
    fn update(&mut self, msg: Message) -> Option<Message> {
-       match msg {
+       let old = self.entry.text.clone();
+       let msg = self.entry.update(msg);
+
+       if self.entry.text != old && !self.entry.text.is_empty() {
+           return Some(Message::Find(self.entry.text.clone()))
+       }
+
+       if msg.is_none() {
+           if self.entry.text != old && !self.entry.text.is_empty() {
+               return Some(Message::Find(self.entry.text.clone()))
+           } else {
+               return None
+           }
+       }
+
+       return match msg.unwrap() {
            Message::OpenFind | Message::Enter => {
                Some(Message::JumpNextHighlight)
            },
-           Message::InsertChar(c) => {
-                self.entry.push(c);
-                Some(Message::Find(self.entry.clone()))
-           },
-           Message::Backspace => {
-            self.entry.pop();
-            if !self.entry.is_empty() {
-                Some(Message::Find(self.entry.clone()))
-            } else {
-                None
-            }
-           },
-           // we could do a thing where if it receives an ambigious Message:Next
-           // it can choose to replace it with a Message:NextSelection or Message::NextHighlight
            msg => Some(msg),
        }
    }
