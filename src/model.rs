@@ -3,7 +3,7 @@ use std::io::stdout;
 use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
 use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
-use tracing::{debug, error};
+use tracing::{debug, error, trace};
 
 use crate::{buffer::{self, Buffer}, logging::LogError, utilities::{self, Utility, UtilityWindow, developer::DeveloperModel, save_as::SaveAsModel}};
 use crate::notification::Notification;
@@ -17,12 +17,6 @@ pub struct Model {
     pub running: bool,
     /// The utility window
     pub utility: Option<UtilityWindow>,
-    /// Tell the view it may have to scroll
-    /// the buffer because the cursor might've moved
-    /// out of view;
-    /// Basically I should've called this `cursor_moved`
-    /// but alas.
-    pub may_scroll: bool,
     pub theme_set: ThemeSet,
     pub syntax_set: SyntaxSet,
     pub theme: String,
@@ -32,8 +26,6 @@ pub struct Model {
     pub show_whitespace: bool,
     /// is mouse_capture enabled
     pub mouse_capture: bool,
-    /// tell the view code to center the view
-    pub center_view: bool,
 }
 
 impl Model {
@@ -55,7 +47,6 @@ impl Model {
             selected: 0,
             running: true,
             utility: None,
-            may_scroll: false,
             theme_set,
             syntax_set,
             theme: "dracula".to_owned(),
@@ -63,7 +54,6 @@ impl Model {
             notification: None,
             show_whitespace: false,
             mouse_capture: true,
-            center_view: false,
         }
     }
 
@@ -98,6 +88,12 @@ impl Model {
             debug!("Utility {:?} returned {:?}", &self.utility.as_ref().unwrap(), &msg);
         }
 
+        // If the view should be altered
+        let mut scroll_view = false;
+        let mut center_view = false;
+        let mut next_msg = None;
+
+        // Finally evaluate the message
         match msg {
             Message::NoMessage => {},
             Message::NextBuffer => self.selected = (self.selected + 1) % self.buffers.len(),
@@ -131,72 +127,72 @@ impl Model {
             Message::ScrollUp => self.current_buffer_mut().top = self.current_buffer_mut().top.saturating_sub(2),
             Message::OpenHelp => self.utility = Some(UtilityWindow::Help(utilities::help::HelpModel())),
             Message::OpenFind => self.utility = Some(UtilityWindow::Find(utilities::find::FindModel::new())),
-            Message::Escape => return Some(Message::CloseUtility),
+            Message::Escape => next_msg = Some(Message::CloseUtility),
             Message::CloseUtility => self.utility = None,
             Message::InsertChar(chr) => {
                 self.current_buffer_mut().insert(chr);
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::MoveLeft => {
                 self.current_buffer_mut().move_left();
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::MoveRight => {
                 self.current_buffer_mut().move_right();
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::MoveUp => {
                 self.current_buffer_mut().move_up();
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::MoveDown => {
                 self.current_buffer_mut().move_down();
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::PageUp => {
                 let height = self.viewport.height as usize;
                 self.current_buffer_mut().page_up(height);
-                // self.may_scroll = true;
+                // scroll_view = true;
             },
             Message::PageDown => {
                 let height = self.viewport.height as usize;
                 self.current_buffer_mut().page_down(height);
-                // self.may_scroll = true;
+                // scroll_view = true;
             },
             Message::Backspace => self.current_buffer_mut().backspace(),
             Message::Delete => self.current_buffer_mut().delete(),
             Message::JumpWordLeft => {
                 self.current_buffer_mut().move_word_left();
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::JumpWordRight => {
                 self.current_buffer_mut().move_word_right();
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::GotoStartOfLine => self.current_buffer_mut().goto_start_of_line(),
             Message::GotoEndOfLine => self.current_buffer_mut().goto_end_of_line(),
-            Message::Enter => return Some(Message::InsertChar('\n')),
+            Message::Enter => next_msg = Some(Message::InsertChar('\n')),
             Message::Find(query) => {
                 let occurences = self.current_buffer_mut().highlight(query);
                 // if the find utility is open, set the occurences
                 if let Some(UtilityWindow::Find(find)) = &mut self.utility {
                     find.occurences = Some(occurences);
                 }
-               return Some(Message::JumpNextHighlight);
+               next_msg = Some(Message::JumpNextHighlight);
             },
             Message::Save => {
                 if self.current_buffer().name.is_none() {
                     self.utility = Some(UtilityWindow::SaveAs(SaveAsModel::new()));
-                    return None
+                    next_msg = None
                 }
                 if let Err(e) = self.current_buffer_mut().save() {
                     tracing::warn!("{:?}", e);
-                    return Some(Message::Notification(
+                    next_msg = Some(Message::Notification(
                         format!("Error writing file: {e}"),
                         Style::new().bg(Color::Red).fg(Color::White)
                     ));
                 } else {
-                    return Some(Message::Notification(
+                    next_msg = Some(Message::Notification(
                         String::from("SAVED"),
                         Style::new().bg(Color::Green).fg(Color::Black)
                     ));
@@ -205,12 +201,12 @@ impl Model {
             Message::SaveAsRoot => {
                 if let Err(e) = self.current_buffer_mut().save_as_root() {
                     tracing::error!("Error saving as root: {e:?}");
-                    return Some(Message::Notification(
+                    next_msg = Some(Message::Notification(
                         format!("Error saving as root: {e}"),
                         Style::new().bg(Color::Red).fg(Color::White)
                     ));
                 } else {
-                    return Some(Message::Notification(
+                    next_msg = Some(Message::Notification(
                         String::from("SAVED AS ROOT"),
                         Style::new().bg(Color::Yellow).fg(Color::Black)
                     ));
@@ -232,7 +228,7 @@ impl Model {
             Message::OpenShell => self.utility = Some(utilities::UtilityWindow::Shell(utilities::shell::ShellModel::new())),
             Message::Double(first, second) => {
                 self.update(*first);
-                return Some(*second);
+                next_msg = Some(*second);
             },
             Message::SaveAsRootConfirmation => {
                 self.utility = Some(UtilityWindow::Confirm(
@@ -246,22 +242,22 @@ impl Model {
             },
             Message::ToBottom => {
                 self.current_buffer_mut().to_bottom();
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::ToTop => {
                 self.current_buffer_mut().to_top();
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::Tab => {
                 self.current_buffer_mut().insert('\t');
-                self.may_scroll = true;
+                scroll_view = true;
             },
             Message::Suspend => match crate::suspend::suspend().log() {
                 Ok(_) => {},
                 Err(e) => {
                     let _ = crate::tui::setup();
                     let _ = crate::TERMINAL.get().unwrap().lock().unwrap().clear();
-                    return Some(Message::Notification(
+                    next_msg = Some(Message::Notification(
                         format!("Suspendin failed with {:?}", e),
                         Style::new().bg(Color::Red).fg(Color::White)
                     ))
@@ -283,14 +279,14 @@ impl Model {
             Message::DragMouseLeft => {},
             Message::JumpNextHighlight => {
                 self.current_buffer_mut().jump_next_highlight();
-                self.center_view = true;
+                center_view = true;
             },
             Message::SaveAs(path) => {
                 let old = self.current_buffer().name.clone();
                 self.current_buffer_mut().name = Some(path);
                 match self.current_buffer_mut().save() {
                     Ok(()) => {
-                        return Some(Message::Notification(
+                        next_msg = Some(Message::Notification(
                             String::from("SAVED"),
                             Style::new().bg(Color::Green).fg(Color::Black)
                         ));
@@ -299,15 +295,24 @@ impl Model {
                         // revert old name/path
                         self.current_buffer_mut().name = old;
                         tracing::warn!("{:?}", e);
-                        return Some(Message::Notification(
+                        next_msg = Some(Message::Notification(
                             format!("Error writing file: {e}"),
                             Style::new().bg(Color::Red).fg(Color::White)
                         ));
                     }
                 }
             },
+        };
+
+        if center_view {
+            self.center_view();
         }
-        None
+
+        if scroll_view {
+            self.scroll_view();
+        }
+
+        next_msg
     }
 
     pub fn current_buffer_mut(&mut self) -> &mut Buffer {
@@ -320,6 +325,24 @@ impl Model {
 
     pub fn theme(&self) -> &Theme {
         return &self.theme_set.themes[&self.theme]
+    }
+
+    fn scroll_view(&mut self) {
+        let layout = self.layout();
+        let cursor_y = self.current_buffer().cursor.y;
+        let current_buffer = self.current_buffer_mut();
+        if cursor_y < current_buffer.top {
+            current_buffer.top = cursor_y as usize;
+        } else if cursor_y >= current_buffer.top + layout.buffer.height as usize {
+            let diff = cursor_y - (current_buffer.top + layout.buffer.height as usize);
+            current_buffer.top += diff as usize + 1;
+        }
+    }
+
+    fn center_view(&mut self) {
+        let layout = self.layout();
+        let half_height = layout.buffer.height / 2;
+        self.current_buffer_mut().top = self.current_buffer().cursor.y.saturating_sub(half_height as usize);
     }
 }
 

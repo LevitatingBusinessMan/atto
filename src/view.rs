@@ -1,9 +1,12 @@
 //! For rendering the model
 
+use std::os::linux::raw::stat;
+
 use color_eyre::owo_colors::OwoColorize;
 use ratatui::{layout::{Alignment, Constraint, Direction, Layout}, style::{Style, Stylize}, text::Line, widgets::{Clear, Paragraph, Scrollbar, ScrollbarState}, Frame};
 use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
 use tracing::trace;
+use ratatui::prelude::*;
 
 use crate::{model::Model, parse::parse_from, utilities::{Utility}};
 use crate::buffer::Buffer;
@@ -12,56 +15,81 @@ use crate::utilities::UtilityWindow;
 /// files over this size might be handled differently (like not having a scrollbar)
 pub static LARGE_FILE_LIMIT: usize = 1_000_000;
 
+pub struct AttoLayout {
+    pub buffer: Rect,
+    pub scrollbar: Option<Rect>,
+    /// the status bar
+    pub status: Rect,
+    /// whole area
+    pub all: Rect,
+    /// upper half
+    pub upper: Rect,
+    /// lower half
+    pub lower: Rect,
+    pub utility: Rect,
+}
+
 impl Model {
-    #[tracing::instrument(skip_all, level="trace")]
-    pub fn view(&mut self, f: &mut Frame) {
+    pub fn layout(&self) -> AttoLayout {
+        let all = Rect { x: 0, y: 0, width: self.viewport.width, height: self.viewport.height };
+
         // split between status bar and rest
-        let main = Layout::default()
+        let status_bar_split = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(0), Constraint::Length(1)])
-                .split(f.area());
+                .split(all);
 
         let content_height = self.current_buffer().linestarts.len() - 1;
-        let scrollbar_width = if content_height as u16 > f.area().height {1} else {0};
+        let with_scrollbar = content_height as u16 > self.viewport.height;
 
         let buffer_and_scrollbar = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Min(0), Constraint::Length(scrollbar_width)])
-            .split(main[0]);
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .split(status_bar_split[0]);
+
+        let buffer = if with_scrollbar {
+            buffer_and_scrollbar[0]
+        } else {
+            status_bar_split[0]
+        };
+
+        let scrollbar = if with_scrollbar {
+            Some(buffer_and_scrollbar[1])
+        } else {
+            None
+        };
 
         let vertical_middle_split = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(f.area());
+            .split(all);
 
-        let utility_area  = Layout::default()
+        let utility  = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Min(0), Constraint::Max(30), Constraint::Length(scrollbar_width)])
+            .constraints([Constraint::Min(0), Constraint::Max(30), Constraint::Length(if with_scrollbar {1} else {0})])
             .split(vertical_middle_split[0])[1];
 
-        // Scroll the buffer if the cursor was moved out of view.
-        if self.may_scroll {
-            let cursor_y = self.current_buffer().cursor.y;
-            let current_buffer = self.current_buffer_mut();
-            trace!("may_scroll is true");
-            if cursor_y < current_buffer.top {
-                current_buffer.top = cursor_y as usize;
-            } else if cursor_y >= current_buffer.top + buffer_and_scrollbar[0].height as usize {
-                let diff = cursor_y - (current_buffer.top + buffer_and_scrollbar[0].height as usize);
-                current_buffer.top += diff as usize + 1;
-            }
-            self.may_scroll = false;
+        AttoLayout {
+            all,
+            buffer,
+            scrollbar,
+            utility,
+            status: status_bar_split[1],
+            upper: vertical_middle_split[1],
+            lower: vertical_middle_split[0],
         }
+    }
 
-        if self.center_view {
-            let half_height = buffer_and_scrollbar[0].height / 2;
-            self.current_buffer_mut().top = self.current_buffer().cursor.y.saturating_sub(half_height as usize);
-            self.center_view = false;
-        }
+    #[tracing::instrument(skip_all, level="trace")]
+    pub fn view(&self, f: &mut Frame) {
+        let layout = self.layout();
+
+        let content_height = self.current_buffer().linestarts.len() - 1;
+        let scrollbar_width = if content_height as u16 > self.viewport.height {1} else {0};
 
         let current_buffer = self.current_buffer();
 
-        let buffer_widget = match highlight(current_buffer, buffer_and_scrollbar[0].height as usize, &self.syntax_set, self.theme(), self.show_whitespace) {
+        let buffer_widget = match highlight(current_buffer, layout.buffer.height as usize, &self.syntax_set, self.theme(), self.show_whitespace) {
             Ok(tokens) => Paragraph::new(tokens),
             Err(e) => {
                 tracing::error!("{:?}", e);
@@ -74,7 +102,7 @@ impl Model {
 
         f.render_widget(
             buffer_widget,
-            buffer_and_scrollbar[0]
+            layout.buffer
         );
 
         // if in view, display cursor
@@ -83,17 +111,18 @@ impl Model {
             f.set_cursor_position((self.current_buffer().cursor.x as u16, self.current_buffer().cursor.y as u16 - self.current_buffer().top as u16));
         }
 
-        let scrollbar = Scrollbar::default();
-        let mut scrollbar_state = ScrollbarState::new(content_height.saturating_sub(f.area().height as usize))
-            .position(self.current_buffer().top);
-
-        if scrollbar_width > 0 {
+        if let Some(scrollbar_area) = layout.scrollbar {
+            let scrollbar = Scrollbar::default();
+            let mut scrollbar_state = ScrollbarState::new(content_height.saturating_sub(f.area().height as usize))
+                .position(self.current_buffer().top);
             f.render_stateful_widget(
                 scrollbar,
-                buffer_and_scrollbar[1],
+                scrollbar_area,
                 &mut scrollbar_state
             );
         }
+
+
 
         f.render_widget(
             Paragraph::new(
@@ -110,35 +139,34 @@ impl Model {
                             if self.current_buffer().dirty().unwrap() { "+" } else { "" },
                             self.selected+1, self.buffers.len(),
                         ),
-                        width = main[1].width as usize - "Welcome to Atto! Ctrl-h for help".len() - 3
+                        width = self.viewport.width as usize - "Welcome to Atto! Ctrl-h for help".len() - 3
                     ),
                     Style::default()
                     .black()
                     .on_white()
                 )
             ),
-            main[1]
+            layout.status
         );
 
         match &self.utility {
-            Some(UtilityWindow::Help(help)) => help.view(f, utility_area),
-            Some(UtilityWindow::Find(find)) => find.view(f, utility_area),
-            Some(UtilityWindow::Confirm(confirm)) => confirm.view(f, utility_area),
-            Some(UtilityWindow::Developer(developer)) => developer.view(f, utility_area),
-            Some(UtilityWindow::Shell(shell)) => shell.view(f, utility_area),
-            Some(UtilityWindow::SaveAs(save_as)) => save_as.view(f, utility_area),
+            Some(UtilityWindow::Help(help)) => help.view(f, layout.utility),
+            Some(UtilityWindow::Find(find)) => find.view(f, layout.utility),
+            Some(UtilityWindow::Confirm(confirm)) => confirm.view(f, layout.utility),
+            Some(UtilityWindow::Developer(developer)) => developer.view(f, layout.utility),
+            Some(UtilityWindow::Shell(shell)) => shell.view(f, layout.utility),
+            Some(UtilityWindow::SaveAs(save_as)) => save_as.view(f, layout.utility),
             None => {},
         }
 
         // render notification
         if let Some(notification) = &self.notification {
-            let buffer = buffer_and_scrollbar[0];
-            let wrapped_content = textwrap::fill(&notification.content, buffer.width as usize);
+            let wrapped_content = textwrap::fill(&notification.content, layout.buffer.width as usize);
             let height = wrapped_content.lines().count();
             let mut area = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(0), Constraint::Length(height as u16)])
-                .split(buffer)[1];
+                .split(layout.buffer)[1];
             // notifiations that take up no more than a single line
             // are aligned to the right and only the text is colorized
             let alignment = if height > 1 { Alignment::Left } else { Alignment::Right };

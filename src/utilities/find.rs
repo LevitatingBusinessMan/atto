@@ -43,6 +43,9 @@ impl utilities::Utility for FindModel {
            Message::OpenFind | Message::Enter => {
                Some(Message::JumpNextHighlight)
            },
+           // Message::MoveLeft => {
+           //     Some(Message::JumpPreviousHighlight)
+           // },
            msg => Some(msg),
        }
    }
