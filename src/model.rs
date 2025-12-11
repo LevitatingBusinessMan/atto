@@ -235,8 +235,11 @@ impl Model {
             Message::Paste(paste) => self.current_buffer_mut().paste(&paste),
             Message::OpenShell => self.utility = Some(utilities::UtilityWindow::Shell(utilities::shell::ShellModel::new())),
             Message::Double(first, second) => {
-                self.update(*first);
-                next_msg = Some(*second);
+                if let Some(msg) = self.update(*first) {
+                    next_msg = Some(Message::Double(Box::new(msg), Box::new(*second)));
+                } else {
+                    next_msg = Some(*second);
+                }
             },
             Message::SaveAsRootConfirmation => {
                 self.utility = Some(UtilityWindow::Confirm(
