@@ -102,14 +102,19 @@ impl Model {
             Message::Quit => {
                 match self.current_buffer().dirty() {
                     Ok(true) => {
-                        self.utility = Some(UtilityWindow::Confirm(
-                            utilities::confirm::ConfirmModel::new(
-                                String::from("There are unsaved changes. Do you want to save?"),
-                                vec![
-                                    ('y', Message::Double(Box::new(Message::Save), Box::new(Message::Quit))),
-                                    ('n', Message::QuitNoSave),
-                                ]
-                        )));
+                        if matches!(self.utility, Some(UtilityWindow::SaveAs(_))) {
+                            // ignore quit if save as window is open
+                            debug!("ignoring quit message, save as utility is open");
+                        } else {
+                            self.utility = Some(UtilityWindow::Confirm(
+                                utilities::confirm::ConfirmModel::new(
+                                    String::from("There are unsaved changes. Do you want to save?"),
+                                    vec![
+                                        ('y', Message::Double(Box::new(Message::Save), Box::new(Message::Quit))),
+                                        ('n', Message::QuitNoSave),
+                                    ]
+                            )));
+                        }
                     },
                     Ok(false) => self.running = false,
                     Err(err) => {
