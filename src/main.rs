@@ -20,6 +20,7 @@ mod utilities;
 mod wrap;
 mod suspend;
 mod undo;
+mod clipboard;
 
 use logging::{setup_logging, LogError};
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};

@@ -5,8 +5,9 @@ use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{buffer::{self, Buffer}, logging::LogError, undo::UndoState, utilities::{self, Utility, UtilityWindow, developer::DeveloperModel, save_as::SaveAsModel}};
+use crate::{buffer::{self, Buffer}, clipboard::{self, Clipboard}, logging::LogError, themes::colors::notifications::{WARNING_BG, WARNING_FG}, undo::UndoState, utilities::{self, Utility, UtilityWindow, developer::DeveloperModel, save_as::SaveAsModel}};
 use crate::notification::Notification;
+use crate::themes::colors::notifications::*;
 
 pub struct Model {
     /// What buffer is selected
@@ -28,7 +29,7 @@ pub struct Model {
     pub mouse_capture: bool,
     /// did the last message cause an error
     pub last_error: bool,
-    pub clipboard: String,
+    pub clipboard: Clipboard,
 }
 
 impl Model {
@@ -45,6 +46,10 @@ impl Model {
         for buffer in &mut buffers {
             buffer.find_syntax(&syntax_set);
         }
+
+        let clipboard = Clipboard::new();
+        debug!("using {clipboard:?} clipboard");
+
         Model {
             buffers: buffers,
             selected: 0,
@@ -58,7 +63,7 @@ impl Model {
             show_whitespace: false,
             mouse_capture: true,
             last_error: false,
-            clipboard: String::new(),
+            clipboard,
         }
     }
 
@@ -194,8 +199,8 @@ impl Model {
                 self.current_buffer_mut().move_word_right();
                 self.scroll_view();
             },
-            Message::GotoStartOfLine => self.current_buffer_mut().goto_start_of_line(),
-            Message::GotoEndOfLine => self.current_buffer_mut().goto_end_of_line(),
+            Message::JumpStartOfLine => self.current_buffer_mut().goto_start_of_line(),
+            Message::JumpEndOfLine => self.current_buffer_mut().goto_end_of_line(),
             Message::Enter => self.update(Message::InsertChar('\n')),
             Message::Find(query) => {
                 let occurences = self.current_buffer_mut().highlight(query);
@@ -213,13 +218,13 @@ impl Model {
                         tracing::warn!("{:?}", e);
                         self.update(Message::Notification(
                             format!("Error writing file: {e}"),
-                            Style::new().bg(Color::Red).fg(Color::White)
+                            Style::new().bg(ERROR_BG).fg(ERROR_FG)
                         ));
                         self.last_error = true;
                     } else {
                         self.update(Message::Notification(
                             String::from("SAVED"),
-                            Style::new().bg(Color::Green).fg(Color::Black)
+                            Style::new().bg(SUCCESS_BG).fg(SUCCES_FG)
                         ));
                     }
                 }
@@ -229,13 +234,13 @@ impl Model {
                     tracing::warn!("Error saving as root: {e:?}");
                     self.update(Message::Notification(
                         format!("Error saving as root: {e}"),
-                        Style::new().bg(Color::Red).fg(Color::White)
+                        Style::new().bg(ERROR_BG).fg(ERROR_FG)
                     ));
                     self.last_error = true;
                 } else {
                     self.update(Message::Notification(
                         String::from("SAVED AS ROOT"),
-                        Style::new().bg(Color::Yellow).fg(Color::Black)
+                        Style::new().bg(WARNING_BG).fg(WARNING_FG)
                     ));
                 }
             },
@@ -256,6 +261,19 @@ impl Model {
                 self.current_buffer_mut().paste(&paste);
                 let after = self.current_buffer().position;
                 self.current_buffer_mut().undo.record(before, after, msg.clone(), Message::UndoInsertion(paste.len()));
+            },
+            Message::PasteClipboard => {
+                match self.clipboard.get() {
+                    Ok(contents) => {
+                        self.update(Message::Paste(contents));
+                    },
+                    Err(e) => {
+                        self.update(Message::Notification(
+                            format!("Clipboard error: {e}"),
+                            Style::new().bg(ERROR_BG).fg(ERROR_FG),
+                        ));
+                    },
+                }
             },
             Message::OpenShell => self.utility = Some(utilities::UtilityWindow::Shell(utilities::shell::ShellModel::new())),
             Message::Double(first, second) => {
@@ -296,7 +314,7 @@ impl Model {
                     let _ = crate::TERMINAL.get().unwrap().lock().unwrap().clear();
                     self.update(Message::Notification(
                         format!("Suspendin failed with {:?}", e),
-                        Style::new().bg(Color::Red).fg(Color::White)
+                        Style::new().bg(ERROR_BG).fg(ERROR_FG)
                     ))
                 },
             },
@@ -329,7 +347,7 @@ impl Model {
                     Ok(()) => {
                         self.update(Message::Notification(
                             format!("SAVED AS {}", path),
-                            Style::new().bg(Color::Green).fg(Color::Black)
+                            Style::new().bg(SUCCESS_BG).fg(SUCCES_FG)
                         ));
                     },
                     Err(e) => {
@@ -338,7 +356,7 @@ impl Model {
                         tracing::warn!("{:?}", e);
                         self.update(Message::Notification(
                             format!("Error writing file: {e}"),
-                            Style::new().bg(Color::Red).fg(Color::White)
+                            Style::new().bg(ERROR_BG).fg(ERROR_FG)
                         ));
                         self.last_error = true;
                     }
@@ -376,9 +394,14 @@ impl Model {
             Message::CutLine => {
                 let before = self.current_buffer().position;
                 let (start, end) = self.current_buffer().current_line();
-                self.clipboard = self.current_buffer_mut().drain(start..end);
+                let removed = self.current_buffer_mut().drain(start..end);
+                if let Err(e) = self.clipboard.set(removed.clone()) {
+                    self.update(Message::Notification(
+                        format!("Clipboard error: {e}"),
+                        Style::new().bg(ERROR_BG).fg(ERROR_FG),
+                    ));
+                }
                 self.current_buffer_mut().set_position(start);
-                let removed = self.clipboard.clone();
                 self.current_buffer_mut().undo.record(before, start, msg, Message::Many(vec![
                     Message::InsertString(removed),
                     Message::JumpPosition(before),
@@ -448,8 +471,8 @@ pub enum Message {
     Delete,
     JumpWordLeft,
     JumpWordRight,
-    GotoStartOfLine,
-    GotoEndOfLine,
+    JumpStartOfLine,
+    JumpEndOfLine,
     Enter,
     Save,
     Resize(u16, u16),
@@ -459,7 +482,11 @@ pub enum Message {
     CloseUtility,
     /// Quit immediately
     QuitNoSave,
+    /// Writes a string at cursor position.
+    /// The user invokes this when using bracketed paste.
+    /// For pasting the internal clipboard see [Self::PasteClipboard]
     Paste(String),
+    PasteClipboard,
     OpenShell,
     /// Two messages
     Double(Box<Message>, Box<Message>),

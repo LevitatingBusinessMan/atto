@@ -96,8 +96,8 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                         Some(Message::MoveLeft)
                     }
                 },
-                KeyCode::Char('a') => Some(Message::GotoStartOfLine),
-                KeyCode::Char('e') => Some(Message::GotoEndOfLine),
+                KeyCode::Char('a') => Some(Message::JumpStartOfLine),
+                KeyCode::Char('e') => Some(Message::JumpEndOfLine),
                 // Reverse word jumping
                 KeyCode::Char(' ') => match state.movement_key_down {
                     Some('j') => Some(Message::JumpWordRight),
@@ -120,6 +120,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Char('u') => Some(Message::Undo),
                 KeyCode::Char('y') => Some(Message::Redo),
                 KeyCode::Char('x') => Some(Message::CutLine),
+                KeyCode::Char('v') => Some(Message::PasteClipboard),
                 _ => None,
             }
         } else {
