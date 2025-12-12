@@ -28,6 +28,7 @@ pub struct Model {
     pub mouse_capture: bool,
     /// did the last message cause an error
     pub last_error: bool,
+    pub clipboard: String,
 }
 
 impl Model {
@@ -57,10 +58,11 @@ impl Model {
             show_whitespace: false,
             mouse_capture: true,
             last_error: false,
+            clipboard: String::new(),
         }
     }
 
-    #[tracing::instrument(skip(self), level="debug")]
+    #[tracing::instrument(skip(self), level="debug" fields(last_error=self.last_error))]
     pub fn update(&mut self, msg: Message) {
         // remove notification if elapsed
         // (the handling of this makes it so that if the user does not somehow create a message)
@@ -91,8 +93,6 @@ impl Model {
 
             // Finally evaluate the message
             self.update_inner(msg);
-
-            trace!("{:?}", self.current_buffer().undo);
         }
     }
 
@@ -142,9 +142,10 @@ impl Model {
             Message::Escape => self.update(Message::CloseUtility),
             Message::CloseUtility => self.utility = None,
             Message::InsertChar(chr) => {
-                let pos = self.current_buffer().position;
-                self.current_buffer_mut().undo.r#do(pos, Message::InsertChar(chr), Message::UndoInsertChar);
+                let before = self.current_buffer().position;
                 self.current_buffer_mut().insert(chr);
+                let after = self.current_buffer().position;
+                self.current_buffer_mut().undo.record(before, after, Message::InsertChar(chr), Message::UndoInsertion(1));
                 self.scroll_view();
             },
             Message::MoveLeft => {
@@ -174,14 +175,16 @@ impl Model {
                 // scroll_view = true;
             },
             Message::Backspace => {
-                let pos = self.current_buffer().position;
+                let before = self.current_buffer().position;
                 let removed = self.current_buffer_mut().backspace();
-                self.current_buffer_mut().undo.r#do(pos, msg, Message::UndoBackspace(removed));
+                let after = self.current_buffer().position;
+                self.current_buffer_mut().undo.record(before,after, msg, Message::Paste(removed));
             },
             Message::Delete => {
-                let pos = self.current_buffer().position;
+                let before = self.current_buffer().position;
                 let removed = self.current_buffer_mut().delete();
-                self.current_buffer_mut().undo.r#do(pos, msg, Message::UndoDelete(removed));
+                let after = self.current_buffer().position;
+                self.current_buffer_mut().undo.record(before, after, msg, Message::InsertString(removed));
             },
             Message::JumpWordLeft => {
                 self.current_buffer_mut().move_word_left();
@@ -248,7 +251,12 @@ impl Model {
             Message::DeveloperKey => {
                 self.utility = Some(UtilityWindow::Developer(DeveloperModel()));
             },
-            Message::Paste(paste) => self.current_buffer_mut().paste(&paste),
+            Message::Paste(ref paste) => {
+                let before = self.current_buffer().position;
+                self.current_buffer_mut().paste(&paste);
+                let after = self.current_buffer().position;
+                self.current_buffer_mut().undo.record(before, after, msg.clone(), Message::UndoInsertion(paste.len()));
+            },
             Message::OpenShell => self.utility = Some(utilities::UtilityWindow::Shell(utilities::shell::ShellModel::new())),
             Message::Double(first, second) => {
                 self.update(*first);
@@ -336,20 +344,12 @@ impl Model {
                     }
                 }
             },
-            Message::UndoPaste(n) => {
-                // TODO
-            },
-            Message::UndoBackspace(grapheme)  => {
-                self.current_buffer_mut().position -= grapheme.len();
-                self.current_buffer_mut().paste(&grapheme);
-                self.scroll_view();
-            },
-            Message::UndoDelete(grapheme) => {
-                self.current_buffer_mut().insert_str(&grapheme);
-                self.scroll_view();
-            },
-            Message::UndoInsertChar => {
-                self.current_buffer_mut().delete();
+            // Message::InsertStringBefore(grapheme)  => {
+            //     let at = self.current_buffer().position - grapheme.len();
+            //     self.current_buffer_mut().insert_str_at(at, &grapheme);
+            // },
+            Message::InsertString(string) => {
+                self.current_buffer_mut().insert_str(&string);
             },
             Message::Redo => {
                 let msgs = self.current_buffer_mut().undo.redo();
@@ -365,14 +365,29 @@ impl Model {
                 }
             },
             Message::JumpPosition(position) => {
-                self.current_buffer_mut().position = position;
-                self.current_buffer_mut().update_cursor();
+                self.current_buffer_mut().set_position(position);
                 self.center_view();
             },
             Message::InhibitUndo(msg) => {
               self.current_buffer_mut().undo.inhibited = true;
               self.update(*msg);
               self.current_buffer_mut().undo.inhibited = false;
+            },
+            Message::CutLine => {
+                let before = self.current_buffer().position;
+                let (start, end) = self.current_buffer().current_line();
+                self.clipboard = self.current_buffer_mut().drain(start..end);
+                self.current_buffer_mut().set_position(start);
+                let removed = self.clipboard.clone();
+                self.current_buffer_mut().undo.record(before, start, msg, Message::Many(vec![
+                    Message::InsertString(removed),
+                    Message::JumpPosition(before),
+                ]));
+            },
+            Message::UndoInsertion(n) => {
+                let old_position = self.current_buffer().position;
+                self.current_buffer_mut().drain(old_position-n..old_position);
+                self.current_buffer_mut().set_position(old_position-n);
             },
         };
     }
@@ -463,11 +478,11 @@ pub enum Message {
     JumpPreviousHighlight,
     // save under the following name, updating the buffer path
     SaveAs(String),
-    // buffer action to undo a paste, removing x graphemes
-    UndoPaste(usize),
-    UndoBackspace(String),
-    UndoDelete(String),
-    UndoInsertChar,
+    // buffer action to undo an insertation, basically like backspacing n times
+    UndoInsertion(usize),
+    /// Insert a string **without moving the cursor** (unlike [Message::Paste] or [Message::InsertChar]).
+    /// This does not have an undo method and thus should never be constructed outside of redo actions.
+    InsertString(String),
     Undo,
     Redo,
     Many(Vec<Message>),
@@ -476,4 +491,6 @@ pub enum Message {
     /// run a message while the active buffer's undo is inhibited.
     /// when using this make sure not to use a message that switches the buffer
     InhibitUndo(Box<Message>),
+    /// Cut the current line to the clipboad
+    CutLine,
 }

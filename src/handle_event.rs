@@ -119,6 +119,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Char('z') => Some(Message::Suspend),
                 KeyCode::Char('u') => Some(Message::Undo),
                 KeyCode::Char('y') => Some(Message::Redo),
+                KeyCode::Char('x') => Some(Message::CutLine),
                 _ => None,
             }
         } else {

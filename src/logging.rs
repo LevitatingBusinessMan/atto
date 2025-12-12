@@ -27,7 +27,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
         .with_writer(file)
         .with_target(true)
         .with_ansi(true)
-        .with_span_events(FmtSpan::ACTIVE);
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE);
         //.with_filter(LevelFilter::from_level(level));
 
     let subscriber = Registry::default()

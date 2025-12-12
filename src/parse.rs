@@ -15,6 +15,7 @@ use crate::syntect_tui::{self, SyntectTuiError};
 const CACHE_FREQUENCY: usize = 10;
 
 pub mod whitespace {
+    // zed uses • and →
     pub const TABSIZE: usize = 4;
     // https://www.emacswiki.org/emacs/ShowWhiteSpace
     pub const LF: &'static str = "¶\n"; // pilcrow
@@ -74,7 +75,7 @@ pub fn perform_str_replacements<'a>(str: &'a str, decorate_whitespace: bool) -> 
 }
 
 #[tracing::instrument(skip_all, level="trace", fields(start, limit = limit, from = from, n))]
-pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, cache: &mut HashMap<usize, CachedParseState>, highlighter: &Highlighter, syntax: &SyntaxReference, syntax_set: &SyntaxSet, show_whitespace: bool) 
+pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, cache: &mut HashMap<usize, CachedParseState>, highlighter: &Highlighter, syntax: &SyntaxReference, syntax_set: &SyntaxSet, show_whitespace: bool)
 -> anyhow::Result<Vec<Line<'a>>> {
     let (start, mut state) = match cache.closest_state(from) {
         Some((i, state)) => (i, state.clone()),
@@ -96,9 +97,9 @@ pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, ca
 
         let ops = state.ps.parse_line(line, syntax_set)?;
         let iter = HighlightIterator::new(&mut state.hs, &ops, line, highlighter);
-        
+
         let spans: Result<Vec<Span>, SyntectTuiError> = iter.map(|t| syntect_tui::into_span(t)).collect();
-        
+
         // I need some kind of global preprocessor here
         // it will move whitespace to seperate spans (also color them)
         // then it will replace parts of spans (tabs with 4 spaces, whitespace with symbols)

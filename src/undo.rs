@@ -1,34 +1,26 @@
 use std::time::{Duration, Instant};
 
-use tracing::trace;
+use tracing::{instrument, trace};
 
 use crate::model::Message;
 
 const GROUP_TIME_SPAN: Duration = Duration::new(0, 500_000_000);
 
-/**
- * NOTES
- *
- * For undo it is useful to be able to execute many messages to the model with ease.
- * That's why I think it might be useful to have a Message:Many message.
- * I could also then split the update function to have an inner version which doesn't do the view related work.
- *
- * All the do and undo commands require a position.
- */
-
 #[derive(Debug)]
+/// An action with instructions to reverse it.
 pub struct ReversableAction {
     r#do: Message,
     undo: Message,
-    position: usize,
+    position_before: usize,
+    position_after: usize,
 }
 
 impl ReversableAction {
     pub fn r#do(&self) -> (Message, Message) {
-        (Message::JumpPosition(self.position), self.r#do.clone())
+        (Message::JumpPosition(self.position_before), self.r#do.clone())
     }
     pub fn undo(&self) -> (Message, Message) {
-        (Message::JumpPosition(self.position), self.undo.clone())
+        (Message::JumpPosition(self.position_after), self.undo.clone())
     }
 }
 
@@ -54,8 +46,8 @@ impl UndoGroup {
     pub fn still_valid(&self) -> bool {
         self.start_time.elapsed() < GROUP_TIME_SPAN
     }
-    pub fn push(&mut self, position: usize, msg: Message, inverse: Message) {
-        self.actions.push(ReversableAction { r#do: msg, undo: inverse, position });
+    pub fn push(&mut self, position_before: usize, position_after: usize, msg: Message, inverse: Message) {
+        self.actions.push(ReversableAction { r#do: msg, undo: inverse, position_before, position_after });
     }
     pub fn r#do(&self) -> Vec<Message> {
         let mut v = Vec::with_capacity(self.actions.len() * 2);
@@ -94,7 +86,9 @@ impl UndoState {
             inhibited: false,
         }
     }
-    pub fn r#do(&mut self, position: usize, msg: Message, inverse: Message) {
+
+    #[instrument(skip(self), level="trace", fields(inhibited=self.inhibited))]
+    pub fn r#record(&mut self, position_before: usize, position_after: usize, msg: Message, inverse: Message) {
         if self.inhibited {
             return
         }
@@ -104,13 +98,13 @@ impl UndoState {
         // try to merge with last group
         if let Some(last) = self.previous_group() {
             if last.still_valid() {
-                last.push(position, msg, inverse);
+                last.push(position_before, position_after, msg, inverse);
                 return;
             }
         }
 
         let mut new_group = UndoGroup::new();
-        new_group.push(position, msg, inverse);
+        new_group.push(position_before, position_after, msg, inverse);
         self.history.push(new_group);
         self.index += 1;
     }

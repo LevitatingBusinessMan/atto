@@ -35,7 +35,8 @@ pub struct Buffer {
     pub readonly: bool,
     /// How far the buffer is scrolled
     pub top: usize,
-    /// Which column the cursor wants to be in (that's vague I know)
+    /// Which column the cursor wants to be in (that's vague I know).
+    /// If you move the cursor up and down it will jump to this column if the line is long enough.
     pub prefered_col: Option<usize>,
     /// The cached parse states for this buffer
     pub parse_cache: Rc<RefCell<HashMap<usize, CachedParseState>>>,
@@ -228,8 +229,11 @@ impl Buffer {
         self.cursor.y + 2 == self.linestarts.len()
     }
 
+    /// set position and do related work (like running [Self::update_cursor])
     pub fn set_position(&mut self, pos: usize) {
+        self.prefered_col = None;
         self.position = pos;
+        self.update_cursor();
     }
 
     pub fn set_readonly(&mut self, ro: bool) {
@@ -613,6 +617,12 @@ impl Buffer {
         self.linestarts = generate_linestarts(&self.content);
     }
 
+    /// insert a string at some position
+    pub fn insert_str_at(&mut self, position: usize, content: &str) {
+        self.content.insert_str(position, content);
+        self.linestarts = generate_linestarts(&self.content);
+    }
+
     /// like [insert_str] but moves the cursor
     pub fn paste(&mut self, content: &str) {
         self.prefered_col = None;
@@ -645,6 +655,11 @@ impl Buffer {
         } else {
             String::new()
         }
+    }
+
+    /// Drain a range from the buffer, return removed
+    pub fn drain<R>(&mut self, range: R) -> String where R:  std::ops::RangeBounds<usize> {
+        self.content.drain(range).collect()
     }
 
 }
