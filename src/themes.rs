@@ -9,7 +9,7 @@ pub mod colors {
         use ratatui::style::Color;
         pub const ERROR_BG: Color =  Color::Rgb(200, 0, 0);
         pub const ERROR_FG: Color =  Color::White;
-        pub const SUCCESS_BG: Color = Color::Green;
+        pub const SUCCESS_BG: Color = Color::Rgb(0, 180, 0);
         pub const SUCCES_FG: Color = Color::White;
         pub const WARNING_BG: Color = Color::Yellow;
         pub const WARNING_FG: Color = Color::White;

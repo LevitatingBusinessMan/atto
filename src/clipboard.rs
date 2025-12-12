@@ -69,12 +69,12 @@ impl Clipboard {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            arboard::Error::ContentNotAvailable => f.write_str("unavailable"),
-			arboard::Error::ClipboardNotSupported => f.write_str("not supported"),
-			arboard::Error::ClipboardOccupied => f.write_str("occupation error"),
-			arboard::Error::ConversionFailure => f.write_str("invalid utf-8"),
-			arboard::Error::Unknown { ref description } => f.write_fmt(format_args!("unknown error '{description}'")),
-			_ => f.write_str("unknown error"),
+            arboard::Error::ContentNotAvailable => f.write_str("clipboard unavailable"),
+			arboard::Error::ClipboardNotSupported => f.write_str("clipboard content not supported"),
+			arboard::Error::ClipboardOccupied => f.write_str("clipboard occupation error"),
+			arboard::Error::ConversionFailure => f.write_str("clipboard utf-8 conversion error"),
+			arboard::Error::Unknown { ref description } => f.write_fmt(format_args!("unknown clipboard error '{description}'")),
+			_ => f.write_str("unknown clipboard error"),
         }
     }
 }

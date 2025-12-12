@@ -17,6 +17,7 @@ fancy_regex = ["syntect/default-fancy"]
 
 [dependencies]
 anyhow = "1.0.76"
+arboard = { version = "3.6.1", features = ["wayland-data-control"] }
 clap = { version = "4.5", features = ["derive", "cargo"] }
 color-eyre = "0.6.2"
 crossterm = "0.28"

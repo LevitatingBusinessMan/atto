@@ -162,22 +162,27 @@ impl Model {
         if let Some(notification) = &self.notification {
             let wrapped_content = textwrap::fill(&notification.content, layout.buffer.width as usize);
             let height = wrapped_content.lines().count();
-            let mut area = Layout::default()
+            let area = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(0), Constraint::Length(height as u16)])
                 .split(layout.buffer)[1];
+            f.render_widget(Clear, area);
+            let alignment = if height > 1 { Alignment::Left } else { Alignment::Center };
+            // commented code (and comment) that follows is old behavior
+            // where a single line notification would sit in the lower right corner
+            //
             // notifiations that take up no more than a single line
             // are aligned to the right and only the text is colorized
-            let alignment = if height > 1 { Alignment::Left } else { Alignment::Right };
-            if height < 2 {
-                let width = wrapped_content.chars().count();
-                area = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Min(0), Constraint::Length(width as u16)])
-                    .split(area)[1];
-            } else {
-                f.render_widget(Clear, area);
-            }
+            //
+            // if height < 2 {
+            //     let width = wrapped_content.chars().count();
+            //     area = Layout::default()
+            //         .direction(Direction::Horizontal)
+            //         .constraints([Constraint::Min(0), Constraint::Length(width as u16)])
+            //         .split(area)[1];
+            // } else {
+            //     f.render_widget(Clear, area);
+            // }
             let widget = Paragraph::new(wrapped_content)
                 .style(notification.style)
                 .scroll((height.saturating_sub(area.height as usize) as u16,0))

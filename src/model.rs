@@ -217,13 +217,13 @@ impl Model {
                     if let Err(e) = self.current_buffer_mut().save() {
                         tracing::warn!("{:?}", e);
                         self.update(Message::Notification(
-                            format!("Error writing file: {e}"),
+                            format!("{e}"),
                             Style::new().bg(ERROR_BG).fg(ERROR_FG)
                         ));
                         self.last_error = true;
                     } else {
                         self.update(Message::Notification(
-                            String::from("SAVED"),
+                            String::from("Saved"),
                             Style::new().bg(SUCCESS_BG).fg(SUCCES_FG)
                         ));
                     }
@@ -231,15 +231,15 @@ impl Model {
             },
             Message::SaveAsRoot => {
                 if let Err(e) = self.current_buffer_mut().save_as_root() {
-                    tracing::warn!("Error saving as root: {e:?}");
+                    tracing::warn!("{e:?}");
                     self.update(Message::Notification(
-                        format!("Error saving as root: {e}"),
+                        format!("{e}"),
                         Style::new().bg(ERROR_BG).fg(ERROR_FG)
                     ));
                     self.last_error = true;
                 } else {
                     self.update(Message::Notification(
-                        String::from("SAVED AS ROOT"),
+                        String::from("Saved as root"),
                         Style::new().bg(WARNING_BG).fg(WARNING_FG)
                     ));
                 }
@@ -269,7 +269,7 @@ impl Model {
                     },
                     Err(e) => {
                         self.update(Message::Notification(
-                            format!("Clipboard error: {e}"),
+                            format!("{e}"),
                             Style::new().bg(ERROR_BG).fg(ERROR_FG),
                         ));
                     },
@@ -346,7 +346,7 @@ impl Model {
                 match self.current_buffer_mut().save() {
                     Ok(()) => {
                         self.update(Message::Notification(
-                            format!("SAVED AS {}", path),
+                            format!("Saved as {}", path),
                             Style::new().bg(SUCCESS_BG).fg(SUCCES_FG)
                         ));
                     },
@@ -355,7 +355,7 @@ impl Model {
                         self.current_buffer_mut().name = old;
                         tracing::warn!("{:?}", e);
                         self.update(Message::Notification(
-                            format!("Error writing file: {e}"),
+                            format!("{e}"),
                             Style::new().bg(ERROR_BG).fg(ERROR_FG)
                         ));
                         self.last_error = true;
@@ -397,7 +397,7 @@ impl Model {
                 let removed = self.current_buffer_mut().drain(start..end);
                 if let Err(e) = self.clipboard.set(removed.clone()) {
                     self.update(Message::Notification(
-                        format!("Clipboard error: {e}"),
+                        format!("{e}"),
                         Style::new().bg(ERROR_BG).fg(ERROR_FG),
                     ));
                 }

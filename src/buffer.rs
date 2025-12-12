@@ -605,7 +605,7 @@ impl Buffer {
         self.content.insert(self.position, chr);
         self.position += 1;
         // TODO do not blindly generate linestarts
-        self.linestarts = generate_linestarts(&self.content);
+        self.update_linestarts();
         self.update_cursor();
         // TODO can I invalidate from the current line instead?
         self.parse_cache.borrow_mut().invalidate_from(self.top);
@@ -614,13 +614,13 @@ impl Buffer {
     /// insert a string without moving the cursor
     pub fn insert_str(&mut self, content: &str) {
         self.content.insert_str(self.position, content);
-        self.linestarts = generate_linestarts(&self.content);
+        self.update_linestarts();
     }
 
     /// insert a string at some position
     pub fn insert_str_at(&mut self, position: usize, content: &str) {
         self.content.insert_str(position, content);
-        self.linestarts = generate_linestarts(&self.content);
+        self.update_linestarts();
     }
 
     /// like [insert_str] but moves the cursor
@@ -637,7 +637,7 @@ impl Buffer {
             let removed = self.content.drain(b..self.position).collect();
             self.position = b;
             self.prefered_col = None;
-            self.linestarts = generate_linestarts(&self.content);
+            self.update_linestarts();
             self.update_cursor();
             removed
         } else {
@@ -649,7 +649,7 @@ impl Buffer {
     pub fn delete(&mut self) -> String {
         if let Some((_s, b)) = self.cur_grapheme() {
             let removed = self.content.drain(self.position..b).collect();
-            self.linestarts = generate_linestarts(&self.content);
+            self.update_linestarts();
             self.update_cursor();
             removed
         } else {
@@ -659,7 +659,13 @@ impl Buffer {
 
     /// Drain a range from the buffer, return removed
     pub fn drain<R>(&mut self, range: R) -> String where R:  std::ops::RangeBounds<usize> {
-        self.content.drain(range).collect()
+        let removed = self.content.drain(range).collect();
+        self.update_linestarts();
+        removed
+    }
+
+    pub fn update_linestarts(&mut self) {
+        self.linestarts = generate_linestarts(&self.content);
     }
 
 }
