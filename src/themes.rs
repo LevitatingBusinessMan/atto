@@ -13,6 +13,8 @@ pub mod colors {
         pub const SUCCES_FG: Color = Color::White;
         pub const WARNING_BG: Color = Color::Yellow;
         pub const WARNING_FG: Color = Color::White;
+        pub const NOTIFY_BG: Color = Color::Rgb(100, 100, 100);
+        pub const NOTIFY_FG: Color = Color::White;
     }
 }
 

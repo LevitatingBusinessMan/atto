@@ -223,7 +223,7 @@ impl Model {
                         self.last_error = true;
                     } else {
                         self.update(Message::Notification(
-                            String::from("Saved"),
+                            String::from("saved"),
                             Style::new().bg(SUCCESS_BG).fg(SUCCES_FG)
                         ));
                     }
@@ -239,7 +239,7 @@ impl Model {
                     self.last_error = true;
                 } else {
                     self.update(Message::Notification(
-                        String::from("Saved as root"),
+                        String::from("saved as root"),
                         Style::new().bg(WARNING_BG).fg(WARNING_FG)
                     ));
                 }
@@ -346,7 +346,7 @@ impl Model {
                 match self.current_buffer_mut().save() {
                     Ok(()) => {
                         self.update(Message::Notification(
-                            format!("Saved as {}", path),
+                            format!("saved as {}", path),
                             Style::new().bg(SUCCESS_BG).fg(SUCCES_FG)
                         ));
                     },
@@ -411,6 +411,17 @@ impl Model {
                 let old_position = self.current_buffer().position;
                 self.current_buffer_mut().drain(old_position-n..old_position);
                 self.current_buffer_mut().set_position(old_position-n);
+            },
+            Message::ToggleWhitespace => {
+                self.show_whitespace = !self.show_whitespace;
+                self.update(Message::Notification(
+                    format!("whitespace {}", if self.show_whitespace {"true"} else {"false"}),
+                    Style::new().bg(NOTIFY_BG).fg(NOTIFY_FG),
+                ));
+            },
+            Message::OpenHelpBuffer => {
+                self.buffers.push(crate::help::help_buffer());
+                self.selected = self.buffers.len()-1;
             },
         };
     }
@@ -520,4 +531,6 @@ pub enum Message {
     InhibitUndo(Box<Message>),
     /// Cut the current line to the clipboad
     CutLine,
+    ToggleWhitespace,
+    OpenHelpBuffer,
 }

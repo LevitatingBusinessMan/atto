@@ -1,0 +1,7 @@
+Welcome to atto. Close this tab with ctrl-w.
+
+Common key-bindings:
+  ctrl-c Copy
+  ctrl-v Paste
+  alt-f MoveLeft
+  alt-j MoveRight

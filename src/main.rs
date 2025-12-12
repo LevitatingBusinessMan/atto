@@ -1,7 +1,3 @@
-#![feature(int_roundings)]
-#![feature(io_error_more)]
-#![feature(iter_advance_by)]
-#![feature(read_buf)]
 use std::{fs::{self}, io::{self, Stdout}, path::PathBuf, sync::{Mutex, OnceLock}};
 
 use clap::{crate_version, Parser};
@@ -21,6 +17,7 @@ mod wrap;
 mod suspend;
 mod undo;
 mod clipboard;
+mod help;
 
 use logging::{setup_logging, LogError};
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};

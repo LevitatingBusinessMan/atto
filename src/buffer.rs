@@ -136,6 +136,27 @@ impl Buffer {
         }
     }
 
+    pub fn from_string(string: String) -> Self {
+        let linestarts = generate_linestarts(&string);
+        return Self {
+            name: None,
+            content: string,
+            file: None,
+            position: 0,
+            cursor: Cursor { x: 0, y: 0 },
+            linestarts: linestarts,
+            readonly: false,
+            opened_readonly: false,
+            top: 0,
+            prefered_col: None,
+            parse_cache: Rc::new(RefCell::new(HashMap::new())),
+            syntax: None,
+            highlights: vec![],
+            dirty: true,
+            undo: UndoState::new(),
+        }
+    }
+
     pub fn increase_all_linestarts(&mut self, from: usize, n: usize) {
         self.linestarts.iter_mut().for_each(|ls| if from >= *ls { *ls = ls.saturating_add(n) });
     }

@@ -33,6 +33,9 @@ impl super::Utility for DeveloperModel {
                     'm' => {
                         Some(Message::ToggleMouseCapture)
                     },
+                    'h' => {
+                        Some(Message::OpenHelpBuffer)
+                    },
                     _ => None
                 }
             },
@@ -45,6 +48,7 @@ impl super::Utility for DeveloperModel {
         * z - experiemntal suspend option
         * n - new buffer
         * m - toggle mouse capture
+        * h - open help buffer
         "}, f, area);
     }
 }
