@@ -122,6 +122,8 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Char('x') => Some(Message::CutLine),
                 KeyCode::Char('v') => Some(Message::PasteClipboard),
                 KeyCode::Char(' ') => Some(Message::ToggleWhitespace),
+                KeyCode::Char('c') => Some(Message::CopyLine),
+                KeyCode::Char('d') => Some(Message::DeleteLine),
                 _ => None,
             }
         } else {

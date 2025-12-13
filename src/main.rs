@@ -48,8 +48,6 @@ struct Args {
     logfile: Option<PathBuf>,
     #[arg(long, help="do not alter the buffer")]
     readonly: bool,
-    #[arg(long, help="visualize whitespace")]
-    whitespace: bool,
     files: Option<Vec<String>>
 }
 
@@ -69,7 +67,6 @@ fn main() -> anyhow::Result<()> {
 
     let theme_set = themes::theme_set().log()?;
     let mut model = Model::new(buffers, theme_set, terminal.size().unwrap());
-    model.show_whitespace = args.whitespace;
 
     let mut event_state = handle_event::EventState::default();
 

@@ -49,7 +49,7 @@ impl Clipboard {
         match self {
             Clipboard::System(clipboard) => match clipboard.set_text(content) {
                 Ok(()) => {
-                    info!("Copied {} bytes to system clipboard", length);
+                    info!("Saved {} bytes to system clipboard", length);
                     Ok(())
                 },
                 Err(e) => {
@@ -59,7 +59,7 @@ impl Clipboard {
             },
             Clipboard::Local(string) => {
                 *string = content;
-                debug!("Copied {} bytes to local clipboard", length);
+                debug!("Saved {} bytes to local clipboard", length);
                 Ok(())
             },
         }

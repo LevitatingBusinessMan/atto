@@ -279,7 +279,6 @@ impl Model {
             Message::Double(first, second) => {
                 self.update(*first);
                 if !self.last_error {
-                    info!("yes {:?}", second);
                     self.update(*second);
                 } else {
                     warn!("not executing {:?} due to previous error", second);
@@ -392,20 +391,10 @@ impl Model {
               self.current_buffer_mut().undo.inhibited = false;
             },
             Message::CutLine => {
-                let before = self.current_buffer().position;
-                let (start, end) = self.current_buffer().current_line();
-                let removed = self.current_buffer_mut().drain(start..end);
-                if let Err(e) = self.clipboard.set(removed.clone()) {
-                    self.update(Message::Notification(
-                        format!("{e}"),
-                        Style::new().bg(ERROR_BG).fg(ERROR_FG),
-                    ));
-                }
-                self.current_buffer_mut().set_position(start);
-                self.current_buffer_mut().undo.record(before, start, msg, Message::Many(vec![
-                    Message::InsertString(removed),
-                    Message::JumpPosition(before),
-                ]));
+                self.update(Message::Double(
+                    Box::new(Message::CopyLine),
+                    Box::new(Message::DeleteLine),
+                ));
             },
             Message::UndoInsertion(n) => {
                 let old_position = self.current_buffer().position;
@@ -422,6 +411,29 @@ impl Model {
             Message::OpenHelpBuffer => {
                 self.buffers.push(crate::help::help_buffer());
                 self.selected = self.buffers.len()-1;
+            },
+            Message::CopyLine => {
+                let line = self.current_buffer().current_line_str().to_owned();
+                match self.clipboard.set(line) {
+                    Ok(_) => {},
+                    Err(e) => {
+                        self.last_error = true;
+                        self.update(Message::Notification(
+                            format!("{e}"),
+                            Style::new().bg(ERROR_BG).fg(ERROR_FG),
+                        ));
+                    },
+                }
+            },
+            Message::DeleteLine => {
+                let before = self.current_buffer().position;
+                let (start, end) = self.current_buffer().current_line();
+                let removed = self.current_buffer_mut().drain(start..end);
+                self.current_buffer_mut().set_position(start);
+                self.current_buffer_mut().undo.record(before, start, msg, Message::Many(vec![
+                    Message::InsertString(removed),
+                    Message::JumpPosition(before),
+                ]));
             },
         };
     }
@@ -533,4 +545,6 @@ pub enum Message {
     CutLine,
     ToggleWhitespace,
     OpenHelpBuffer,
+    DeleteLine,
+    CopyLine,
 }

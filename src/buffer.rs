@@ -620,12 +620,9 @@ impl Buffer {
         }
     }
 
-    // read only should be handled in model
-
     pub fn insert(&mut self, chr: char) {
         self.content.insert(self.position, chr);
         self.position += 1;
-        // TODO do not blindly generate linestarts
         self.update_linestarts();
         self.update_cursor();
         // TODO can I invalidate from the current line instead?
