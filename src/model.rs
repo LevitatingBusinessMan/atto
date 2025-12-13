@@ -30,6 +30,8 @@ pub struct Model {
     /// did the last message cause an error
     pub last_error: bool,
     pub clipboard: Clipboard,
+    // how many spaces to insert for tab, or none
+    pub tab_to_spaces: Option<usize>,
 }
 
 impl Model {
@@ -64,6 +66,7 @@ impl Model {
             mouse_capture: true,
             last_error: false,
             clipboard,
+            tab_to_spaces: None,
         }
     }
 
@@ -303,7 +306,14 @@ impl Model {
                 self.scroll_view();
             },
             Message::Tab => {
-                self.current_buffer_mut().insert('\t');
+                match self.tab_to_spaces {
+                    Some(size) => {
+                        self.current_buffer_mut().paste(&" ".repeat(size));
+                    },
+                    None => {
+                        self.current_buffer_mut().insert('\t');
+                    },
+                }
                 self.scroll_view();
             },
             Message::Suspend => match crate::suspend::suspend().log() {
@@ -435,6 +445,19 @@ impl Model {
                     Message::JumpPosition(before),
                 ]));
             },
+            Message::ToggleTabToSpaces => {
+                match self.tab_to_spaces {
+                    Some(_) =>{
+                        self.tab_to_spaces = None;
+                        self.notify("using tabs".to_owned());
+                    },
+                    None => {
+                        let size = 4;
+                        self.tab_to_spaces = Some(size);
+                        self.notify(format!("converting tab to {size} spaces"));
+                    },
+                }
+            }
         };
     }
 
@@ -468,6 +491,34 @@ impl Model {
         let layout = self.layout();
         let half_height = layout.buffer.height / 2;
         self.current_buffer_mut().top = self.current_buffer().cursor.y.saturating_sub(half_height as usize);
+    }
+
+    fn notify(&mut self, string: String) {
+        self.update(Message::Notification(
+            string,
+            Style::new().bg(NOTIFY_BG).fg(NOTIFY_FG),
+        ));
+    }
+
+    fn notify_error(&mut self, string: String) {
+        self.update(Message::Notification(
+            string,
+            Style::new().bg(ERROR_BG).fg(ERROR_FG),
+        ));
+    }
+
+    fn notify_success(&mut self, string: String) {
+        self.update(Message::Notification(
+            string,
+            Style::new().bg(SUCCESS_BG).fg(SUCCES_FG),
+        ));
+    }
+
+    fn notify_warn(&mut self, string: String) {
+        self.update(Message::Notification(
+            string,
+            Style::new().bg(WARNING_BG).fg(WARNING_FG),
+        ));
     }
 }
 
@@ -547,4 +598,5 @@ pub enum Message {
     OpenHelpBuffer,
     DeleteLine,
     CopyLine,
+    ToggleTabToSpaces,
 }

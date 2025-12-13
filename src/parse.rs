@@ -16,12 +16,15 @@ const CACHE_FREQUENCY: usize = 10;
 
 pub mod whitespace {
     // zed uses • and →
+    /// the visual size of real tabs
     pub const TABSIZE: usize = 4;
+    /// what to replace tabs with in whitespace mode
+    pub const TAB_SYMBOL: &'static str = "→";
     // https://www.emacswiki.org/emacs/ShowWhiteSpace
     pub const LF: &'static str = "¶\n"; // pilcrow
     pub const CR: &'static str = "⁋";
     //static LF: &'static str = "\n$";
-    pub const SPACE: &'static str = "·";
+    pub const SPACE: &'static str = "•"; // previously used smaller ·
 }
 
 pub trait ParseCacheTrait {
@@ -61,7 +64,7 @@ pub fn perform_str_replacements<'a>(str: &'a str, decorate_whitespace: bool) -> 
     if str.chars().any(|c| toreplace.contains(&c)) {
         if decorate_whitespace {
             cow
-            .replace("\t", &"↦".repeat(whitespace::TABSIZE))
+            .replace("\t", &whitespace::TAB_SYMBOL.repeat(whitespace::TABSIZE))
             .replace("\n", whitespace::LF)
             .replace("\r", whitespace::CR)
             .replace(" ", whitespace::SPACE).into()

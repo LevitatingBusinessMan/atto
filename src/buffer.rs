@@ -23,12 +23,12 @@ pub struct Buffer {
     pub name: Option<String>,
     pub content: String,
     pub file: Option<Arc<Mutex<File>>>,
-	/// cursors byte index into the buffer
+    /// cursors byte index into the buffer
     pub position: usize,
-	/// visual (grapheme) cursor position
-	pub cursor: Cursor,
-	/// the indexes of all the beginnings of lines
-	pub linestarts: Vec<usize>,
+    /// visual (grapheme) cursor position
+    pub cursor: Cursor,
+    /// the indexes of all the beginnings of lines
+    pub linestarts: Vec<usize>,
     /// the file was opened as readonly
     pub opened_readonly: bool,
     /// This buffer shall not be edited
@@ -627,11 +627,13 @@ impl Buffer {
         self.update_cursor();
         // TODO can I invalidate from the current line instead?
         self.parse_cache.borrow_mut().invalidate_from(self.top);
+        self.prefered_col = None;
     }
 
     /// insert a string without moving the cursor
     pub fn insert_str(&mut self, content: &str) {
         self.content.insert_str(self.position, content);
+        self.parse_cache.borrow_mut().invalidate_from(self.top);
         self.update_linestarts();
     }
 
