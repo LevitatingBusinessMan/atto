@@ -24,6 +24,7 @@ pub fn handle_event(_m: &Model, state: &mut EventState) -> anyhow::Result<Option
         match event::read()?  {
             event::Event::Key(key) =>  Ok(handle_key(key, state)),
             event::Event::Mouse(mouse) => Ok(handle_mouse(mouse)),
+            // TODO resizes occur in batches, ideally we poll agani
             event::Event::Resize(x, y) => Ok(Some(Message::Resize(x, y))),
             event::Event::Paste(paste) => Ok(Some(Message::Paste(paste))),
             _ => Ok(None),
