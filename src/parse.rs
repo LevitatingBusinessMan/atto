@@ -125,6 +125,8 @@ pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, ca
         // those replacents should be registered somewhere, so other functions can replicate
         // the line length difference
         // the functions that use that are str_column_length and crate::wrap::get_linebreak_locations
+        // 
+        // EDIT didn't I implement something like this with perform_str_replacements
 
         if line_no >= from {
             // Remove background color and handle whitespace chars
