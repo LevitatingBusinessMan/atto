@@ -71,7 +71,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut lsp = crate::lsp::LspConnection::new("rust-analyzer").unwrap();
     let _ = lsp.on_hover();
-    error!("{}", lsp.read_stderr()?);
+    //error!("{}", lsp.read_stderr()?);
     
     let mut event_state = handle_event::EventState::default();
 

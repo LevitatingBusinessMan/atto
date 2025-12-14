@@ -1,20 +1,19 @@
-use std::{io::{self, BufRead, BufReader, Read, Write}, os::fd::{AsRawFd, BorrowedFd}, process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio}};
+use std::{io::{self, BufRead, BufReader, Read, Write}, os::fd::{AsRawFd, BorrowedFd}, process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio}, sync::mpsc::{self, Receiver, Sender, channel}, thread};
 
 use anyhow::Context;
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 use serde_json::json;
-use tracing::{info, trace};
+use tracing::{error, info, trace};
 
-pub struct LspConnection<'a> {
+pub struct LspConnection {
     child: Child,
     stdin: ChildStdin,
-    stdout: BufReader<ChildStdout>,
     stderr: ChildStderr,
-    pollfds: [PollFd<'a>; 2],
     initialized: bool,
+    stdout_rx: Receiver<anyhow::Result<serde_json::Value>>,
 }
 
-impl<'a> LspConnection<'a> {
+impl LspConnection {
     pub fn new(name: &str) -> anyhow::Result<Self> {
         let mut child = Command::new(name)
             .stdin(Stdio::piped())
@@ -24,19 +23,17 @@ impl<'a> LspConnection<'a> {
         let stdin = child.stdin.take().unwrap();
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
+
+        let (tx, rx) = channel::<anyhow::Result<serde_json::Value>>();
         
-        let pollfds = [
-            PollFd::new(unsafe { BorrowedFd::borrow_raw(stdout.as_raw_fd()) }, PollFlags::POLLIN),
-            PollFd::new(unsafe { BorrowedFd::borrow_raw(stderr.as_raw_fd()) }, PollFlags::POLLIN),
-        ];
+        thread::spawn(move || Self::read_thread(tx, BufReader::new(stdout)));
         
         let mut me = Self {
             child,
             stdin,
-            stdout: BufReader::new(stdout),
             stderr,
             initialized: false,
-            pollfds
+            stdout_rx: rx,
         };
         
         me.initialize().context("failed to initialize lsp")?;
@@ -47,17 +44,46 @@ impl<'a> LspConnection<'a> {
     /* NOTE
      * It might be best to read stdout using a thread, but poll for stderr.
      */
-    
-    pub fn poll(&mut self) -> anyhow::Result<()> {
-        if poll(&mut self.pollfds, PollTimeout::ZERO)? > 0 {
-            if self.pollfds[0].any().unwrap() {
-
-            }
-            if self.pollfds[1].any().unwrap() {
-                
+     
+    /// loop for reading the stdout
+    fn read_thread(tx: Sender<anyhow::Result<serde_json::Value>>, mut stdout: BufReader<ChildStdout>) {
+        loop {
+            match Self::read_stdout(&mut stdout) {
+                Ok(json) => {
+                    tx.send(Ok(json)).unwrap();
+                },
+                Err(e) => {
+                    error!("lsp read error {e:?}");
+                    tx.send(Err(e)).unwrap();
+                    break;
+                },
             }
         }
-        Ok(())
+    }
+    
+    fn read_stdout(stdout: &mut BufReader<ChildStdout>) -> anyhow::Result<serde_json::Value> {
+        let mut line = String::new();
+        stdout.read_line(&mut line)?;
+        trace!("lsp stdout {line:?}");
+        let length = line.strip_prefix("Content-Length: ").context("invalid lsp response")?;
+        let length: usize = length.trim_end().parse::<usize>().context("invalid lsp response")?;
+        stdout.read_line(&mut String::new())?;
+        let mut out = String::with_capacity(length);
+        stdout.by_ref().take(length as u64).read_to_string(&mut out)?;
+        trace!("lsp stdout {out}");
+        let json = serde_json::from_str(&out)?;
+        Ok(json)
+    }
+    
+    fn poll_stderr(&mut self) -> anyhow::Result<bool> {
+        let mut pollfds = [
+          PollFd::new(unsafe { BorrowedFd::borrow_raw(self.stderr.as_raw_fd()) }, PollFlags::POLLIN)  
+        ];
+        if poll(&mut pollfds, PollTimeout::ZERO)? > 0 {
+            Ok(true)
+        } else {
+            Ok(false)            
+        }
     }
     
     fn initialize(&mut self) -> anyhow::Result<()> {
@@ -80,8 +106,8 @@ impl<'a> LspConnection<'a> {
         
         // process request
         self.write(json)?;
-        self.read()?;
-        
+        self.stdout_rx.recv()??;
+
         // send notification
         let json = json!({
             "jsonrpc": "2.0",
@@ -89,11 +115,8 @@ impl<'a> LspConnection<'a> {
             "params": {}
         }).to_string();
         self.write(json)?;
-        
+
         self.initialized = true;
-        
-        // temp sleep
-        std::thread::sleep(std::time::Duration::from_millis(500));
         
         Ok(())
     }
@@ -102,19 +125,6 @@ impl<'a> LspConnection<'a> {
         self.stdin.write_fmt(format_args!("Content-Length: {}\r\n\r\n", json.len()))?;
         self.stdin.write_all(json.as_bytes())?;
         self.stdin.flush()?;
-        Ok(())
-    }
-    
-    fn read(&mut self) -> anyhow::Result<()> {
-        let mut line = String::new();
-        self.stdout.read_line(&mut line)?;
-        trace!("lsp stdout {line:?}");
-        let length = line.strip_prefix("Content-Length: ").context("invalid lsp response")?;
-        let length: usize = length.trim_end().parse::<usize>().context("invalid lsp response")?;
-        self.stdout.read_line(&mut String::new())?;
-        let mut out = String::with_capacity(length);
-        self.stdout.by_ref().take(length as u64).read_to_string(&mut out)?;
-        trace!("lsp stdout {out}");
         Ok(())
     }
     
@@ -134,7 +144,7 @@ impl<'a> LspConnection<'a> {
             "id": 2
         }).to_string();
         self.write(json)?;
-        self.read()?;
+        self.stdout_rx.recv()??;
         Ok(())
     }
     
