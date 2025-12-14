@@ -59,19 +59,35 @@ pub fn perform_str_replacements<'a>(str: &'a str, decorate_whitespace: bool) -> 
     let toreplace = if decorate_whitespace {
         vec!['\t', '\n', '\r', ' ']
     } else {
-        vec!['\t']
+        vec!['\t', '\x1b']
     };
-    if str.chars().any(|c| toreplace.contains(&c)) {
+    if str.chars().any(|c| toreplace.contains(&c) || !matches!(c, '\x20'..'\x7e') ) {
+        let mut new = String::with_capacity(cow.len());
         if decorate_whitespace {
-            cow
-            .replace("\t", &whitespace::TAB_SYMBOL.repeat(whitespace::TABSIZE))
-            .replace("\n", whitespace::LF)
-            .replace("\r", whitespace::CR)
-            .replace(" ", whitespace::SPACE).into()
+            for c in cow.chars() {
+                match c {
+                    '\t' => new.push_str(&whitespace::TAB_SYMBOL.repeat(whitespace::TABSIZE)),
+                    '\n'=> new.push_str(whitespace::LF),
+                    '\r'=> new.push_str(whitespace::CR),
+                    ' ' => new.push_str(whitespace::SPACE),
+                    // ASCI escape codes
+                    '\x00'..'\x20' | '\x7f' => new.push_str(&c.escape_unicode().to_string()),
+                    c => new.push(c),
+                }
+            }
         } else {
-            cow
-            .replace("\t", &" ".repeat(whitespace::TABSIZE)).into()
+            for c in cow.chars() {
+                match c {
+                    '\t' => new.push_str(&" ".repeat(whitespace::TABSIZE)),
+                    '\n' => new.push('\n'),
+                    '\r' => {},
+                    // ASCI escape codes
+                    '\x00'..'\x20' | '\x7f' => new.push_str(&c.escape_unicode().to_string()),
+                    c => new.push(c),
+                }
+            }
         }
+        new.into()
     } else {
         cow
     }

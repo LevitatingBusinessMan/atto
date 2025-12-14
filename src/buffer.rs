@@ -323,6 +323,7 @@ impl Buffer {
     /// move to next grapheme cluster
     pub fn move_right(&mut self) {
         if let Some((_s, b)) = self.cur_grapheme() {
+            tracing::error!("{_s} {b}");
             self.position = b;
             self.prefered_col = None;
             self.update_cursor();
@@ -740,7 +741,6 @@ fn linestarts() {
 "123
 123
 ");
-    println!("{:?}", buf.linestarts);
     assert!(buf.linestarts == vec![0,4,8,8]);
 }
 
@@ -751,7 +751,6 @@ fn linestarts_snowman() {
 "1☃3
 123
 ");
-    println!("{:?}", buf.linestarts);
     assert!(buf.linestarts == vec![0,6,10,10]);
 }
 
@@ -760,13 +759,11 @@ fn linestarts_no_lb() {
     let mut buf = Buffer::empty();
     buf.paste(
 "123");
-    println!("{:?}", buf.linestarts);
     assert!(buf.linestarts == vec![0,3]);
 }
 
 #[test]
 fn linestarts_empty() {
     let buf = Buffer::empty();
-    println!("{:?}", buf.linestarts);
     assert!(buf.linestarts == vec![0,0]);
 }
