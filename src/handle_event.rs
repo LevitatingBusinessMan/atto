@@ -142,6 +142,8 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Delete => Some(Message::Delete),
                 KeyCode::F(12) => Some(Message::DeveloperKey),
                 KeyCode::Tab => Some(Message::Tab),
+                KeyCode::Home => Some(Message::JumpStartOfLine),
+                KeyCode::End => Some(Message::JumpEndOfLine),
                 _ => None
             }
         }
