@@ -1,18 +1,20 @@
-use std::{io::{self, BufRead, BufReader, Read, Write}, process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio}};
+use std::{io::{self, BufRead, BufReader, Read, Write}, os::fd::{AsRawFd, BorrowedFd}, process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio}};
 
 use anyhow::Context;
+use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 use serde_json::json;
 use tracing::{info, trace};
 
-pub struct LspConnection {
+pub struct LspConnection<'a> {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
     stderr: ChildStderr,
+    pollfds: [PollFd<'a>; 2],
     initialized: bool,
 }
 
-impl LspConnection {
+impl<'a> LspConnection<'a> {
     pub fn new(name: &str) -> anyhow::Result<Self> {
         let mut child = Command::new(name)
             .stdin(Stdio::piped())
@@ -22,20 +24,42 @@ impl LspConnection {
         let stdin = child.stdin.take().unwrap();
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
-                
+        
+        let pollfds = [
+            PollFd::new(unsafe { BorrowedFd::borrow_raw(stdout.as_raw_fd()) }, PollFlags::POLLIN),
+            PollFd::new(unsafe { BorrowedFd::borrow_raw(stderr.as_raw_fd()) }, PollFlags::POLLIN),
+        ];
+        
         let mut me = Self {
             child,
             stdin,
             stdout: BufReader::new(stdout),
             stderr,
             initialized: false,
+            pollfds
         };
         
         me.initialize().context("failed to initialize lsp")?;
         
         Ok(me)
     }
-        
+    
+    /* NOTE
+     * It might be best to read stdout using a thread, but poll for stderr.
+     */
+    
+    pub fn poll(&mut self) -> anyhow::Result<()> {
+        if poll(&mut self.pollfds, PollTimeout::ZERO)? > 0 {
+            if self.pollfds[0].any().unwrap() {
+
+            }
+            if self.pollfds[1].any().unwrap() {
+                
+            }
+        }
+        Ok(())
+    }
+    
     fn initialize(&mut self) -> anyhow::Result<()> {
         let json = json!({
             "jsonrpc": "2.0",
