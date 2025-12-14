@@ -5,8 +5,8 @@ edition = "2021"
 description = "An experimental terminal text editor"
 license = "MIT"
 authors = ["LevitatingBusinessMan"]
-homepage = "https://github.com/LevitatingBusinessMan/atto"
-repository = "https://github.com/LevitatingBusinessMan/atto"
+homepage = "https://git.levitati.ng/LevitatingBusinessMan/atto"
+repository = "https://git.levitati.ng/LevitatingBusinessMan/atto"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
