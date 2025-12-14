@@ -6,6 +6,7 @@ use tracing::{debug, warn};
 
 use crate::{logging::LogError, model::{Message, Model}};
 
+use crate::themes::colors::notifications::*;
 
 //static UNIX_SHELL: &'static str = "sh";
 static UNIX_SHELL: &'static str = "fish";
@@ -86,13 +87,13 @@ impl ShellModel {
                             true => {
                                 return Ok(Message::Notification(
                                     format!("Command executed succesfully, but output was not utf8"),
-                                    Style::new().bg(Color::Green).fg(Color::White)
+                                    Style::new().bg(ERROR_BG).fg(Color::White)
                                 ));
                             },
                             false => {
                                 return Ok(Message::Notification(
                                     format!("Command failed with code {:?}, output was not utf8", status.code()),
-                                    Style::new().bg(Color::Red).fg(Color::White)
+                                    Style::new().bg(ERROR_BG).fg(Color::White)
                                 ));
                             }
                         }
@@ -101,7 +102,7 @@ impl ShellModel {
                             Style::new().bg(Color::White).fg(Color::Black)
                         }
                         else {
-                            Style::new().bg(Color::Red).fg(Color::White)
+                            Style::new().bg(ERROR_BG).fg(Color::White)
                         };
                         let stdout = stdout.unwrap();
                         let stderr = stderr.unwrap();
@@ -154,7 +155,7 @@ impl super::Utility for ShellModel {
                 },
                 Err(e) => {
                     self.entry.clear();
-                    Some(Message::Notification(format!("{e:?}"), Style::new().bg(Color::Red)))
+                    Some(Message::Notification(format!("{e:?}"), Style::new().bg(ERROR_BG)))
                 }
             },
             Message::MoveUp => {
