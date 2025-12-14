@@ -14,6 +14,18 @@ use crate::syntect_tui::{self, SyntectTuiError};
 
 const CACHE_FREQUENCY: usize = 10;
 
+/**
+ * NOTE
+ * syntect does not seem like a safe bet for the future.
+ * i am considering dropping most of the code here for a tree-sitter impl.
+ * the new pipeline would be
+ * source -> tree-sitter -> string replacements -> softwrap? -> ratatui spans
+ * 
+ * a softwrap implementation comes with challenges for buffer and cursor positions
+ * so I am considering never implementing the feature (who uses it?)
+ * instead we would need horizontal scrolling of a single or all lines
+ */
+
 pub mod whitespace {
     // zed uses • and →
     /// the visual size of real tabs
