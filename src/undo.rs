@@ -6,6 +6,17 @@ use crate::model::Message;
 
 const GROUP_TIME_SPAN: Duration = Duration::new(0, 500_000_000);
 
+/**
+ * NOTE
+ * I had a new idea that I could use "Absolute" messages for undo/redo.
+ * They would just say "insert this at position x", or "delete this range"
+ * This would work because the state is always known. Something similar
+ * to this would also be necessary for tree-sitter (marking portions of the source as updated).
+ * 
+ * The current implementation is over-complicated, require a specific "relative"
+ * undo action for each do action.
+ */
+
 #[derive(Debug)]
 /// An action with instructions to reverse it.
 pub struct ReversableAction {
