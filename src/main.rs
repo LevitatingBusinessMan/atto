@@ -18,10 +18,11 @@ mod suspend;
 mod undo;
 mod clipboard;
 mod help;
+mod lsp;
 
 use logging::{setup_logging, LogError};
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};
-use tracing::info;
+use tracing::{error, info};
 use model::Model;
 use handle_event::handle_event;
 use buffer::Buffer;
@@ -68,6 +69,10 @@ fn main() -> anyhow::Result<()> {
     let theme_set = themes::theme_set().log()?;
     let mut model = Model::new(buffers, theme_set, terminal.size().unwrap());
 
+    let mut lsp = crate::lsp::LspConnection::new("rust-analyzer").unwrap();
+    let _ = lsp.on_hover();
+    error!("{}", lsp.read_stderr()?);
+    
     let mut event_state = handle_event::EventState::default();
 
     terminal.draw(|frame| model.view(frame))?;
