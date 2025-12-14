@@ -1,11 +1,8 @@
 //! For rendering the model
 
-use std::os::linux::raw::stat;
 
-use color_eyre::owo_colors::OwoColorize;
 use ratatui::{layout::{Alignment, Constraint, Direction, Layout}, style::{Style, Stylize}, text::Line, widgets::{Clear, Paragraph, Scrollbar, ScrollbarState}, Frame};
 use syntect::{util::LinesWithEndings, highlighting::{Highlighter, Theme}, parsing::SyntaxSet};
-use tracing::trace;
 use ratatui::prelude::*;
 
 use crate::{model::Model, parse::parse_from, utilities::{Utility}};
@@ -13,7 +10,7 @@ use crate::buffer::Buffer;
 use crate::utilities::UtilityWindow;
 
 /// files over this size might be handled differently (like not having a scrollbar)
-pub static LARGE_FILE_LIMIT: usize = 1_000_000;
+//pub static LARGE_FILE_LIMIT: usize = 1_000_000;
 
 pub struct AttoLayout {
     pub buffer: Rect,
