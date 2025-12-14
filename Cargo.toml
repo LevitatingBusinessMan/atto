@@ -42,3 +42,7 @@ rstest = "0.15"
 
 [profile.release]
 overflow-checks = true
+
+[profile.samply]
+inherits = "release"
+debug = true
