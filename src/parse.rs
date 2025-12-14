@@ -8,7 +8,7 @@ use ratatui::text::{Span, Line};
 use syntect::parsing::{ParseState, SyntaxReference, ScopeStack, SyntaxSet};
 use syntect::highlighting::{HighlightState, Highlighter, HighlightIterator};
 use syntect::util::LinesWithEndings;
-use tracing::debug;
+use tracing::{debug, info};
 use unicode_segmentation::UnicodeSegmentation;
 use crate::syntect_tui::{self, SyntectTuiError};
 
@@ -142,6 +142,9 @@ pub fn parse_from<'a>(from: usize, lines: LinesWithEndings<'a>, limit: usize, ca
                 s.bg(ratatui::style::Color::Reset)
             }).collect();
 
+            // the following code is an old attempt to wrap a list of spans
+            // which I apparantly neutered by requesting a line length of 10000?
+ 
             let breaks = crate::wrap::get_linebreak_locations(&line, 10000);
             // this is the glorious linebreak span insertion apparatus
             // given a list of spans and a list of linebreaks
