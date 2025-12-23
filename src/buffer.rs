@@ -503,6 +503,7 @@ impl Buffer {
         if last.1 > self.position {
             if let Some((_start, end)) = self.highlights.iter().find(|(_start, end)| self.position < *end) {
                 self.position = *end;
+                self.prefered_col = None;
             }
         }
         // loop over
@@ -523,6 +524,7 @@ impl Buffer {
         if first.1 < self.position {
             if let Some((_start, end)) = self.highlights.iter().rev().find(|(_start, end)| self.position > *end) {
                 self.position = *end;
+                self.prefered_col = None;
             }
         }
         // loop over
