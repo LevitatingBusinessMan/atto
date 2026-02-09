@@ -39,6 +39,10 @@ impl utilities::Utility for FindModel {
             }
         }
 
+        /* currently if you modify the buffer the utility here gets outdated */
+        /* even though there's focus on this utility, Ctrl+D and other comments can still alter it */
+        /* an easy fix would be to create some kind of 'BufferAltered' message whenever a buffer is altered */
+
         return match msg.unwrap() {
             // I like this approach, but I could also make either of the movement directions
             // close the utility.
