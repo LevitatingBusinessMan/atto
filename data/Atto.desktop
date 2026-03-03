@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Atto
+Exec=atto
+Terminal=true
+Categories=Utility;TextEditor;
+MimeType=text/plain;
