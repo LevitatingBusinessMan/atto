@@ -56,20 +56,24 @@ fn main() -> anyhow::Result<()> {
     let _ = setup_logging(&args);
     info!("Launched with {args:?}");
 
-    let buffers = match &args.files {
-        Some(files) => read_files(files),
-        None => io::Result::Ok(vec![Buffer::empty()]),
-    }.log()?;
-
     let mut terminal = tui::init().log()?;
 
     tui::install_panic_hook();
 
     let theme_set = themes::theme_set().log()?;
-    let mut model = Model::new(buffers, theme_set, terminal.size().unwrap());
+    let mut model = Model::new(theme_set, terminal.size().unwrap());
 
     let mut event_state = handle_event::EventState::default();
 
+    if let Some(paths) = &args.files {
+        let msgs = paths.iter().map(|p| model::Message::OpenBuffer(p.into())).collect();
+        model.update(model::Message::Many(msgs));
+    }
+    
+    if model.buffers.is_empty() {
+        model.update(model::Message::NewEmptyBuffer);
+    }
+    
     terminal.draw(|frame| model.view(frame))?;
     TERMINAL.set(Mutex::new(terminal)).unwrap();
     while model.running {

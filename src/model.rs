@@ -1,4 +1,4 @@
-use std::{io::stdout, rc::Rc};
+use std::{fs, io::{self, stdout}, path::PathBuf, rc::Rc};
 
 use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
 use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
@@ -35,7 +35,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new<'a>(mut buffers: Vec<Buffer>, theme_set: ThemeSet, viewport: Size) -> Model {
+    pub fn new<'a>(theme_set: ThemeSet, viewport: Size) -> Model {
         // let parse_caches = (|| {
         //     let mut map = HashMap::new();
         //     for buf in &buffers {
@@ -45,15 +45,12 @@ impl Model {
         // })();
 
         let syntax_set = SyntaxSet::load_defaults_newlines();
-        for buffer in &mut buffers {
-            buffer.find_syntax(&syntax_set);
-        }
 
         let clipboard = Clipboard::new();
         debug!("using {clipboard:?} clipboard");
 
         Model {
-            buffers: buffers,
+            buffers: vec![],
             selected: 0,
             running: true,
             utility: None,
@@ -457,6 +454,41 @@ impl Model {
                         self.notify(format!("converting tab to {size} spaces"));
                     },
                 }
+            },
+            Message::OpenBuffer(path) => {
+                let buf = match fs::File::options().read(true).write(true).open(path.clone()) {
+                    Ok(f) => Some(Buffer::new(path.clone(), f, false)),
+                    Err(err) => match err.kind() {
+                        io::ErrorKind::PermissionDenied => {
+                            tracing::debug!("Permission denied opening {path:?}, attempting to open readonly");
+                            match fs::File::options().read(true).open(&path) {
+                                Ok(f) => {
+                                    self.notify_warn("no permission to write to file".into());
+                                    Some(Buffer::new(path.clone(), f, true))
+                                },
+                                Err(err) => {
+                                    self.notify_error(format!("could not open file due to '{:?}'", err.kind()));
+                                    tracing::error!("Error opening {path:?}: {err:?}");
+                                    None
+                                },
+                            }
+                        },
+                        io::ErrorKind::NotFound => {
+                            tracing::debug!("Path {path:?} was not found, creating empty buffer");
+                            let mut buf = Buffer::empty();
+                            buf.name = Some(path.clone());
+                            Some(buf)
+                        },
+                        _ => {
+                            tracing::error!("Error opening {path:?}: {err:?}");
+                            None
+                        }
+                    },
+                };
+                if let Some(mut buf) = buf {
+                    buf.find_syntax(&self.syntax_set);
+                    self.buffers.push(buf);
+                }
             }
         };
     }
@@ -599,4 +631,5 @@ pub enum Message {
     DeleteLine,
     CopyLine,
     ToggleTabToSpaces,
+    OpenBuffer(String),
 }
