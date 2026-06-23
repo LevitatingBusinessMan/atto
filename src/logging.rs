@@ -4,6 +4,7 @@ use dirs;
 use tracing::{Level, debug, info, level_filters::LevelFilter};
 use tracing_subscriber::{EnvFilter, Layer, Registry, fmt::format::FmtSpan, layer::SubscriberExt};
 use unicode_segmentation::GraphemeIncomplete;
+use std::ffi::CStr;
 
 pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
     let default_level = if args.debug || cfg!(debug_assertions) { Level::TRACE } else { Level::INFO };
@@ -11,6 +12,18 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
             .with_default_directive(default_level.into())
             .from_env().map_err(|_| io::Error::other("env filter failed"))?;
 
+    let syslog = {
+        static IDENTITY: &'static CStr = c"atto";
+        let (options, facility) = Default::default();
+        let writer = syslog_tracing::Syslog::new(IDENTITY, options, facility)
+            .ok_or(io::Error::other("failed to create syslog writer"))?;
+        tracing_subscriber::fmt::layer()
+                .without_time()
+                .with_target(false)
+                .with_ansi(false)
+                .with_writer(writer)
+    };
+    
     let file = fs::File::options()
         .write(true)
         .append(true)
@@ -22,7 +35,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
             )
         )?;
 
-    let fmt_layer = tracing_subscriber::fmt::layer()
+    let file_layer = tracing_subscriber::fmt::layer()
         .with_line_number(true)
         .with_writer(file)
         .with_target(true)
@@ -32,7 +45,8 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
 
     let subscriber = Registry::default()
         .with(env)
-        .with(fmt_layer);
+        .with(syslog)
+        .with(file_layer);
 
     let _ = tracing::subscriber::set_global_default(subscriber);
 

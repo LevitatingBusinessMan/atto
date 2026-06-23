@@ -131,6 +131,7 @@ dependencies = [
  "ratatui 0.29.0",
  "rstest",
  "syntect",
+ "syslog-tracing",
  "textwrap",
  "tracing",
  "tracing-subscriber",
@@ -1675,6 +1676,17 @@ dependencies = [
  "thiserror 2.0.18",
  "walkdir",
  "yaml-rust",
+]
+
+[[package]]
+name = "syslog-tracing"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d349bc2df408b4bf656709a29643641cef7f1795d708f88b105c626a8f64f6e4"
+dependencies = [
+ "libc",
+ "tracing-core",
+ "tracing-subscriber",
 ]
 
 [[package]]
