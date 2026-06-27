@@ -12,7 +12,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
             .with_default_directive(default_level.into())
             .from_env().map_err(|_| io::Error::other("env filter failed"))?;
 
-    let syslog = {
+    let syslog_layer = {
         static IDENTITY: &'static CStr = c"atto";
         let (options, facility) = Default::default();
         let writer = syslog_tracing::Syslog::new(IDENTITY, options, facility)
@@ -44,11 +44,26 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
         //.with_filter(LevelFilter::from_level(level));
 
     let use_log_file = true;
-        
+
+    let fd = 3;
+    let fd_file = fs::File::options()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(format!("/proc/self/{fd}/3"))?;
+
+    let fd_layer = tracing_subscriber::fmt::layer()
+        .with_line_number(true)
+        .with_writer(fd_file)
+        .with_target(true)
+        .with_ansi(true)
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE);
+    
     let subscriber = Registry::default()
         .with(env)
-        .with(syslog)
-        .with(use_log_file.then_some(file_layer));
+        .with(syslog_layer)
+        .with(use_log_file.then_some(file_layer))
+        .with(fd_layer);
 
     let _ = tracing::subscriber::set_global_default(subscriber);
 
