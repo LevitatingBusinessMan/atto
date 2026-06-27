@@ -574,7 +574,7 @@ impl Buffer {
         }
     }
 
-    #[instrument(skip(self))]
+    #[tracing::instrument(skip(self), level="trace")]
     pub fn dirty(&self) -> bool {
         match &self.filename {
             Some(_) => {
