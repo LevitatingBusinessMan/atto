@@ -463,7 +463,7 @@ impl Model {
                             tracing::debug!("Permission denied opening {path:?}, attempting to open readonly");
                             match fs::File::options().read(true).open(&path) {
                                 Ok(f) => {
-                                    self.notify_warn("no permission to write to file".into());
+                                    self.notify_warn("no write permission for file".into());
                                     Some(Buffer::new(path.clone(), f, true))
                                 },
                                 Err(err) => {
