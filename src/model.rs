@@ -362,6 +362,7 @@ impl Model {
             Message::SaveAs(path) => {
                 let old = self.current_buffer().filename.clone();
                 self.current_buffer_mut().filename = Some(path.clone());
+                self.current_buffer_mut().name = path.clone();
                 match self.current_buffer_mut().save() {
                     Ok(()) => {
                         self.update(Message::Notification(
@@ -486,6 +487,7 @@ impl Model {
                     Err(e) => match e.kind() {
                         io::ErrorKind::NotFound => {
                             tracing::debug!("path {path:?} was not found, creating empty buffer");
+                            self.notify("new file".to_owned());
                             Some(Buffer::new(path.clone(), Some(path.clone()), String::new()))
                         },
                         _ => {

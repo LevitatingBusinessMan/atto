@@ -65,7 +65,7 @@ impl ParseCacheTrait for ParseCache {
 /// in the future this should be able to take non-utf8 and create utf8 strings
 /// for binary editing
 /// it is important that whitespace replacements don't change the length for now, because
-/// the whitespace setting isn't globally known
+/// the decorate_whitespace setting isn't globally known
 pub fn perform_str_replacements<'a>(str: &'a str, decorate_whitespace: bool) -> Cow<'a, str> {
     let cow: Cow<'a, str> = Cow::Borrowed(&str);
     let toreplace = if decorate_whitespace {
