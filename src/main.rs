@@ -71,7 +71,13 @@ fn main() -> anyhow::Result<()> {
     }
     
     if model.buffers.is_empty() {
-        model.update(model::Message::NewEmptyBuffer);
+        model.update(model::Message::NewBlankBuffer);
+    }
+
+    if args.readonly {
+        for b in &mut model.buffers {
+            b.set_readonly(true);
+        }
     }
     
     terminal.draw(|frame| model.view(frame))?;
@@ -85,31 +91,6 @@ fn main() -> anyhow::Result<()> {
 
     tui::restore()?;
     Ok(())
-}
-
-fn read_files(paths: &Vec<String>) -> io::Result<Vec<Buffer>> {
-    let mut buffers: Vec<Buffer> = Vec::with_capacity(paths.len());
-    for path in paths.iter() {
-        let buf = match fs::File::options().read(true).write(true).open(path) {
-            Ok(f) => Buffer::new(path.clone(), f, false),
-            Err(err) => match err.kind() {
-                io::ErrorKind::PermissionDenied => {
-                    tracing::debug!("Permission denied opening {path:?}, attempting to open readonly");
-                    let f = fs::File::options().read(true).open(path)?;
-                    Buffer::new(path.clone(), f, true)
-                },
-                io::ErrorKind::NotFound => {
-                    let mut buf = Buffer::empty();
-                    buf.name = Some(path.clone());
-                    buf
-                },
-                _ => return Err(err)
-            },
-        };
-
-        buffers.push(buf);
-    }
-    Ok(buffers)
 }
 
 mod tui {

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, os::fd::IntoRawFd, process::{self, Stdio}, rc::Rc, sync::{Arc, LazyLock, Mutex}, usize};
+use std::{cell::RefCell, cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, os::fd::IntoRawFd, path::PathBuf, process::{self, Stdio}, rc::Rc, sync::{Arc, LazyLock, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{info, trace, warn};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
@@ -19,18 +19,15 @@ pub static PRIVESC_CMD: LazyLock<&'static str> = LazyLock::new(|| {
 
 #[derive(Debug)]
 pub struct Buffer {
-    /// used as the path
-    pub name: Option<String>,
+    pub name: String,
     pub content: String,
-    pub file: Option<Arc<Mutex<File>>>,
+    pub filename: Option<String>,
     /// cursors byte index into the buffer
     pub position: usize,
     /// visual (grapheme) cursor position
     pub cursor: Cursor,
     /// the indexes of all the beginnings of lines
     pub linestarts: Vec<usize>,
-    /// the file was opened as readonly
-    pub opened_readonly: bool,
     /// This buffer shall not be edited
     pub readonly: bool,
     /// How far the buffer is scrolled
@@ -93,19 +90,16 @@ pub fn str_column_length_no_lb(s: &str) -> usize {
 }
 
 impl Buffer {
-    pub fn new(name: String, mut file: File, readonly: bool) -> Self {
-        let mut content = String::new();
-        file.read_to_string(&mut content).unwrap();
+    pub fn new(name: String, filename: Option<String>, content: String) -> Self {
         let linestarts = generate_linestarts(&content);
-        return Self {
-            name: Some(name),
-            content: content,
-            file: Some(Arc::new(Mutex::new(file))),
+        Self {
+            filename,
+            name: name,
+            content,
             position: 0,
             cursor: Cursor { x: 0, y: 0 },
             linestarts,
             readonly: false,
-            opened_readonly: readonly,
             top: 0,
             prefered_col: None,
             parse_cache: Rc::new(RefCell::new(HashMap::new())),
@@ -116,45 +110,9 @@ impl Buffer {
         }
     }
 
-    pub fn empty() -> Self {
-        return Self {
-            name: None,
-            content: String::new(),
-            file: None,
-            position: 0,
-            cursor: Cursor { x: 0, y: 0 },
-            linestarts: generate_linestarts(""),
-            readonly: false,
-            opened_readonly: false,
-            top: 0,
-            prefered_col: None,
-            parse_cache: Rc::new(RefCell::new(HashMap::new())),
-            syntax: None,
-            highlights: vec![],
-            dirty: true,
-            undo: UndoState::new(),
-        }
-    }
-
-    pub fn from_string(string: String) -> Self {
-        let linestarts = generate_linestarts(&string);
-        return Self {
-            name: None,
-            content: string,
-            file: None,
-            position: 0,
-            cursor: Cursor { x: 0, y: 0 },
-            linestarts: linestarts,
-            readonly: false,
-            opened_readonly: false,
-            top: 0,
-            prefered_col: None,
-            parse_cache: Rc::new(RefCell::new(HashMap::new())),
-            syntax: None,
-            highlights: vec![],
-            dirty: true,
-            undo: UndoState::new(),
-        }
+    /// for testing only, use new() instead
+    fn empty() -> Self {
+        Self::new(String::new(), None, String::new())
     }
 
     pub fn increase_all_linestarts(&mut self, from: usize, n: usize) {
@@ -536,7 +494,7 @@ impl Buffer {
 
     // Tries to find and set a syntax
     pub fn find_syntax<'a>(&mut self, syntax_set: &'a SyntaxSet) -> Option<&'a SyntaxReference> {
-        let name = self.name.clone()?;
+        let name = self.name.clone();
         let extension = name.split('.').last().unwrap_or("");
         let syntax = match syntax_set.find_syntax_by_extension(extension) {
             Some(syntax) => Some(syntax),
@@ -555,38 +513,32 @@ impl Buffer {
 
     /// save to disk
     pub fn save(&mut self) -> io::Result<()> {
-        if self.name.is_none() {
-            return Err(io::Error::new(io::ErrorKind::Other, "no path specified"));
+        if self.filename.is_none() {
+            return Err(io::Error::other("no filename"))
         }
         if self.readonly {
-            return Err(io::Error::other("Buffer is readonly"))
+            return Err(io::Error::other("buffer is readonly"))
         }
-        if self.opened_readonly {
-            return Err(io::Error::other("No write permission to file"))
-        }
-        if self.file.is_none() {
-            let file = File::options().create(true).read(true).write(true).open(self.name.clone().unwrap())?;
-            self.file = Some(Arc::new(Mutex::new(file)));
-        }
-        let binding = self.file.clone().unwrap();
-        let mut file = binding.lock().unwrap();
+        let filename = self.filename.clone().unwrap();
+        let mut file = File::options().create(true).read(true).write(true).open(&filename)?;
         file.rewind()?;
         file.write_all(self.content.as_bytes())?;
         file.set_len(self.content.len() as u64)?;
 
-        info!("Wrote {} bytes to {}", self.content.as_bytes().len(), self.name.clone().unwrap());
+        info!("Wrote {} bytes to {}", self.content.as_bytes().len(), filename);
 
         Ok(())
     }
 
     #[tracing::instrument(skip(self), level="debug", fields(cmd = *PRIVESC_CMD))]
     pub fn save_as_root(&mut self) -> io::Result<()> {
-        if self.name.is_none() {
-            return Err(io::Error::new(io::ErrorKind::Other, "no path specified"));
+        if self.filename.is_none() {
+            return Err(io::Error::other("no filename"))
         }
+        let filename = self.filename.clone().unwrap();
         let (reader, mut writer) = io::pipe()?;
         let mut dd = process::Command::new(*PRIVESC_CMD)
-            .args(vec!["dd", "bs=4k", &format!("of={}", self.name.clone().unwrap())])
+            .args(vec!["dd", "bs=4k", &format!("of={}", filename)])
             .stdin(reader)
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
@@ -597,7 +549,7 @@ impl Buffer {
         let status = dd.wait()?;
         match status.success() {
             true => {
-                info!("Wrote {} bytes to {} using {} dd", self.content.as_bytes().len(), self.name.clone().unwrap(), *PRIVESC_CMD);
+                info!("Wrote {} bytes to {} using {} dd", self.content.as_bytes().len(), filename, *PRIVESC_CMD);
                 Ok(())
             },
             false => {
@@ -609,13 +561,11 @@ impl Buffer {
     }
 
     pub fn dirty(&self) -> io::Result<bool> {
-        match &self.file {
+        match &self.filename {
             Some(file) => {
-                let mut filecontent = String::new();
-                let mut file = file.lock().unwrap();
-                file.rewind()?;
-                file.read_to_string(&mut filecontent)?;
-                Ok(filecontent != self.content)
+                Ok(true)
+                // TODO restore dirty functionality
+                // best done combined with an inotify watcher
             },
             None => {
                 Ok(!self.content.is_empty())

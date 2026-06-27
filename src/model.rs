@@ -1,4 +1,4 @@
-use std::{fs, io::{self, stdout}, path::PathBuf, rc::Rc};
+use std::{fs, io::{self, Read, stdout}, path::PathBuf, rc::Rc};
 
 use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
 use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
@@ -211,7 +211,7 @@ impl Model {
                self.update(Message::JumpNextHighlight);
             },
             Message::Save => {
-                if self.current_buffer().name.is_none() {
+                if self.current_buffer().filename.is_none() {
                     self.utility = Some(UtilityWindow::SaveAs(SaveAsModel::new()));
                 } else {
                     if let Err(e) = self.current_buffer_mut().save() {
@@ -324,8 +324,8 @@ impl Model {
                     ))
                 },
             },
-            Message::NewEmptyBuffer => {
-                self.buffers.push(Buffer::empty());
+            Message::NewBlankBuffer => {
+                self.buffers.push(Buffer::new("blank".to_owned(), None, String::new()));
                 self.selected = self.buffers.len() - 1;
             },
             Message::ToggleMouseCapture => {
@@ -347,8 +347,8 @@ impl Model {
                 self.center_view();
             },
             Message::SaveAs(path) => {
-                let old = self.current_buffer().name.clone();
-                self.current_buffer_mut().name = Some(path.clone());
+                let old = self.current_buffer().filename.clone();
+                self.current_buffer_mut().filename = Some(path.clone());
                 match self.current_buffer_mut().save() {
                     Ok(()) => {
                         self.update(Message::Notification(
@@ -358,7 +358,7 @@ impl Model {
                     },
                     Err(e) => {
                         // revert old name/path
-                        self.current_buffer_mut().name = old;
+                        self.current_buffer_mut().filename = old;
                         tracing::warn!("{:?}", e);
                         self.update(Message::Notification(
                             format!("{e}"),
@@ -456,36 +456,38 @@ impl Model {
                 }
             },
             Message::OpenBuffer(path) => {
-                let buf = match fs::File::options().read(true).write(true).open(path.clone()) {
-                    Ok(f) => Some(Buffer::new(path.clone(), f, false)),
-                    Err(err) => match err.kind() {
-                        io::ErrorKind::PermissionDenied => {
-                            tracing::debug!("Permission denied opening {path:?}, attempting to open readonly");
-                            match fs::File::options().read(true).open(&path) {
-                                Ok(f) => {
-                                    self.notify_warn("no write permission for file".into());
-                                    Some(Buffer::new(path.clone(), f, true))
-                                },
-                                Err(err) => {
-                                    self.notify_error(format!("could not open file due to '{:?}'", err.kind()));
-                                    tracing::error!("Error opening {path:?}: {err:?}");
-                                    None
-                                },
+                let buf = match fs::File::options().read(true).open(path.clone()) {
+                    Ok(mut f) => {
+                        let mut content = String::new();
+                        match f.read_to_string(&mut content) {
+                            Ok(_n) => {
+                                Some(Buffer::new(path.clone(), Some(path.clone()), content))
+                            },
+                            Err(e) => {
+                                self.notify_error(format!("failure reading {path:?}: '{:?}'", e.kind()));
+                                tracing::error!("failure reading {path:?}: '{e:?}'");
+                                None
                             }
-                        },
-                        io::ErrorKind::NotFound => {
-                            tracing::debug!("Path {path:?} was not found, creating empty buffer");
-                            let mut buf = Buffer::empty();
-                            buf.name = Some(path.clone());
-                            Some(buf)
-                        },
-                        _ => {
-                            tracing::error!("Error opening {path:?}: {err:?}");
-                            None
                         }
                     },
+                    Err(e) => match e.kind() {
+                        io::ErrorKind::NotFound => {
+                            tracing::debug!("path {path:?} was not found, creating empty buffer");
+                            Some(Buffer::new(path.clone(), Some(path.clone()), String::new()))
+                        },
+                        _ => {
+                            self.notify_error(format!("failure opening {path:?}: '{:?}'", e.kind()));
+                            tracing::error!("failure opening {path:?}: '{e:?}'");
+                            None
+                        },
+                    },
                 };
+
                 if let Some(mut buf) = buf {
+                    tracing::error!("{:?}", nix::unistd::access(path.as_str(), nix::unistd::AccessFlags::W_OK));
+                    if let Err(nix::errno::Errno::EACCES) = nix::unistd::access(path.as_str(), nix::unistd::AccessFlags::W_OK) {
+                        self.notify_warn("no write permission for file".to_owned());
+                    }
                     buf.find_syntax(&self.syntax_set);
                     self.buffers.push(buf);
                 }
@@ -604,7 +606,7 @@ pub enum Message {
     ToBottom,
     Tab,
     Suspend,
-    NewEmptyBuffer,
+    NewBlankBuffer,
     ToggleMouseCapture,
     DragMouseLeft,
     JumpNextHighlight,

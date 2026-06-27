@@ -131,7 +131,7 @@ impl Model {
                             self.current_buffer().cursor.x + 1,
                             self.current_buffer().cursor.y + 1,
                             self.current_buffer().position,
-                            self.current_buffer().name.clone().unwrap_or("?".to_string()),
+                            self.current_buffer().name,
                             if self.current_buffer().dirty().unwrap() { "+" } else { "" },
                             self.selected+1, self.buffers.len(),
                         ),

@@ -28,7 +28,7 @@ impl super::Utility for DeveloperModel {
                         Some(Message::CloseUtility)
                     },
                     'n' => {
-                        Some(Message::NewEmptyBuffer)
+                        Some(Message::NewBlankBuffer)
                     },
                     'm' => {
                         Some(Message::ToggleMouseCapture)
