@@ -1,0 +1,26 @@
+# see https://doc.rust-lang.org/cargo/guide/continuous-integration.html#github-actions
+name: Cargo Build & Test
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+    name: Rust Build & Test
+    runs-on: runner
+    strategy:
+      matrix:
+        toolchain:
+          - nightly
+          - beta
+          - stable
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup-init -y --default-toolchain ${{matrix.toolchain}} --target x86_64-unknown-linux-musl
+      - run: echo "$HOME/.cargo/bin" >> $FORGEJO_PATH
+      - run: cargo +${{matrix.toolchain}} build
+      - run: cargo +${{matrix.toolchain}} test
