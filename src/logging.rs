@@ -7,7 +7,7 @@ use unicode_segmentation::GraphemeIncomplete;
 use std::ffi::CStr;
 
 pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
-    let default_level = if args.debug || cfg!(debug_assertions) { Level::TRACE } else { Level::INFO };
+    let default_level = if args.debug || cfg!(debug_assertions) { Level::DEBUG } else { Level::INFO };
     let env = EnvFilter::builder()
             .with_default_directive(default_level.into())
             .from_env().map_err(|_| io::Error::other("env filter failed"))?;
