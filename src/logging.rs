@@ -1,4 +1,4 @@
-use std::{fs, io, os::fd::FromRawFd};
+use std::{fs, io, os::fd::{AsRawFd, FromRawFd, IntoRawFd}};
 use dirs;
 
 use tracing::{Level, debug, info, level_filters::LevelFilter};
@@ -45,14 +45,11 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
 
     let use_log_file = true;
 
-    let fd = 3;
-    let fd_file = fs::File::options()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(format!("/proc/self/{fd}/3"))?;
+    let (pipe_read, pipe_write) = nix::unistd::pipe()?;
+    nix::unistd::dup2(pipe_read.as_raw_fd(), 100)?;
+    let fd_file = unsafe { fs::File::from_raw_fd(pipe_write.into_raw_fd()) };
 
-    let fd_layer = tracing_subscriber::fmt::layer()
+    let pipe_layer = tracing_subscriber::fmt::layer()
         .with_line_number(true)
         .with_writer(fd_file)
         .with_target(true)
@@ -63,7 +60,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
         .with(env)
         .with(syslog_layer)
         .with(use_log_file.then_some(file_layer))
-        .with(fd_layer);
+        .with(pipe_layer);
 
     let _ = tracing::subscriber::set_global_default(subscriber);
 
