@@ -19,7 +19,7 @@ impl Default for EventState {
     }
 }
 
-pub fn handle_event(_m: &Model, state: &mut EventState) -> anyhow::Result<Option<Message>> {
+pub fn handle_event(state: &mut EventState) -> anyhow::Result<Option<Message>> {
     if event::poll(time::Duration::from_millis(100))? {
         match event::read()?  {
             event::Event::Key(key) =>  Ok(handle_key(key, state)),

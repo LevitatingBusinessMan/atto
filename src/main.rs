@@ -4,7 +4,7 @@ use clap::{crate_version, Parser};
 use anyhow;
 
 mod buffer;
-mod handle_event;
+mod input;
 mod model;
 mod view;
 mod parse;
@@ -23,7 +23,7 @@ use logging::{setup_logging, LogError};
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};
 use tracing::info;
 use model::Model;
-use handle_event::handle_event;
+use input::handle_event;
 use buffer::Buffer;
 
 #[cfg(all(feature = "onig", feature = "fancy_regex"))]
@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
     let theme_set = themes::theme_set().log()?;
     let mut model = Model::new(theme_set, terminal.size().unwrap());
 
-    let mut event_state = handle_event::EventState::default();
+    let mut event_state = input::EventState::default();
 
     if let Some(paths) = &args.files {
         let msgs = paths.iter().map(|p| model::Message::OpenBuffer(p.into())).collect();
@@ -83,7 +83,7 @@ fn main() -> anyhow::Result<()> {
     terminal.draw(|frame| model.view(frame))?;
     TERMINAL.set(Mutex::new(terminal)).unwrap();
     while model.running {
-        if let Some(msg) = handle_event(&model, &mut event_state)? {
+        if let Some(msg) = handle_event(&mut event_state)? {
             model.update(msg);
             TERMINAL.get().unwrap().lock().unwrap().draw(|frame| model.view(frame))?;
         }
