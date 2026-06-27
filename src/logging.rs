@@ -1,4 +1,4 @@
-use std::{fs, io};
+use std::{fs, io, os::fd::FromRawFd};
 use dirs;
 
 use tracing::{Level, debug, info, level_filters::LevelFilter};
@@ -43,7 +43,7 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
         .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE);
         //.with_filter(LevelFilter::from_level(level));
 
-    let use_log_file = false;
+    let use_log_file = true;
         
     let subscriber = Registry::default()
         .with(env)

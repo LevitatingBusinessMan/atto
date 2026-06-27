@@ -39,11 +39,12 @@ impl Watcher {
         let watches = Arc::new(Mutex::new(HashMap::new()));
         let inotify_clone = inotify.clone();
         let watches_clone = watches.clone();
-        std::thread::spawn(move || Self {
+        std::thread::Builder::new().name("watcher".into())
+        .spawn(move || Self {
             tx: txm,
             inotify: inotify_clone,
             watches: watches_clone,
-        }.thread());
+        }.thread())?;
         Ok(WatcherController { inotify, watches })
     }
     pub fn thread(self) {
