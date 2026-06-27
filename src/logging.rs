@@ -43,10 +43,12 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
         .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE);
         //.with_filter(LevelFilter::from_level(level));
 
+    let use_log_file = false;
+        
     let subscriber = Registry::default()
         .with(env)
         .with(syslog)
-        .with(file_layer);
+        .with(use_log_file.then_some(file_layer));
 
     let _ = tracing::subscriber::set_global_default(subscriber);
 
