@@ -1,11 +1,11 @@
-use std::{fs, io::{self, Read, stdout}, path::PathBuf, rc::Rc};
+use std::{fs, io::{self, Read, stdout}, path::PathBuf, rc::Rc, sync::mpsc};
 
 use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, ExecutableCommand};
 use ratatui::{layout::Size, prelude::Backend, style::{Color, Style}};
 use syntect::{highlighting::{ThemeSet, Theme}, parsing::SyntaxSet};
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{buffer::{self, Buffer}, clipboard::{self, Clipboard}, logging::LogError, themes::colors::notifications::{WARNING_BG, WARNING_FG}, undo::UndoState, utilities::{self, Utility, UtilityWindow, developer::DeveloperModel, save_as::SaveAsModel}};
+use crate::{buffer::{self, Buffer}, clipboard::{self, Clipboard}, logging::LogError, themes::colors::notifications::{WARNING_BG, WARNING_FG}, undo::UndoState, utilities::{self, Utility, UtilityWindow, developer::DeveloperModel, save_as::SaveAsModel}, watcher::{self, WatcherController}};
 use crate::notification::Notification;
 use crate::themes::colors::notifications::*;
 
@@ -32,6 +32,10 @@ pub struct Model {
     pub clipboard: Clipboard,
     // how many spaces to insert for tab, or none
     pub tab_to_spaces: Option<usize>,
+    /// messages from other threads
+    pub inbox: mpsc::Receiver<Message>,
+    pub inbox_tx: mpsc::Sender<Message>,
+    pub watcher: Option<WatcherController>,
 }
 
 impl Model {
@@ -49,6 +53,16 @@ impl Model {
         let clipboard = Clipboard::new();
         debug!("using {clipboard:?} clipboard");
 
+        let (inbox_tx, inbox) = mpsc::channel();
+
+        let watcher = match watcher::Watcher::start(inbox_tx.clone()) {
+            Ok(w) => Some(w),
+            Err(e) => {
+                tracing::error!("failed starting watcher: {e:?}");
+                None
+            },
+        };
+
         Model {
             buffers: vec![],
             selected: 0,
@@ -64,6 +78,9 @@ impl Model {
             last_error: false,
             clipboard,
             tab_to_spaces: None,
+            inbox,
+            inbox_tx,
+            watcher,
         }
     }
 
@@ -109,7 +126,7 @@ impl Model {
             Message::QuitNoSave => self.running = false,
             Message::Quit => {
                 match self.current_buffer().dirty() {
-                    Ok(true) => {
+                    true => {
                         if matches!(self.utility, Some(UtilityWindow::SaveAs(_))) {
                             // ignore quit if save as window is open
                             // this is more of a work around
@@ -128,11 +145,7 @@ impl Model {
                             )));
                         }
                     },
-                    Ok(false) => self.running = false,
-                    Err(err) => {
-                        error!("{err:?}");
-                        self.running = false;
-                    },
+                    false => self.running = false,
                 }
             },
             Message::ScrollDown => {
@@ -484,14 +497,35 @@ impl Model {
                 };
 
                 if let Some(mut buf) = buf {
-                    tracing::error!("{:?}", nix::unistd::access(path.as_str(), nix::unistd::AccessFlags::W_OK));
                     if let Err(nix::errno::Errno::EACCES) = nix::unistd::access(path.as_str(), nix::unistd::AccessFlags::W_OK) {
                         self.notify_warn("no write permission for file".to_owned());
                     }
                     buf.find_syntax(&self.syntax_set);
+                    buf.calculate_ondisk_hash();
                     self.buffers.push(buf);
+                    if let Some(w) = &mut self.watcher {
+                        w.add(path);
+                    }
                 }
-            }
+            },
+            Message::FileChangedOnDisk(path) => {
+                match self.buffers.iter_mut().find(|b| b.filename == Some(path.clone())) {
+                    Some(b) => {
+                        b.calculate_ondisk_hash();
+                        if b.dirty() {
+                            let txt = if self.current_buffer().filename.as_ref() == Some(&path) {
+                                "file changed on disk".to_owned()
+                            } else {
+                                format!("file {path} changed on disk")
+                            };
+                            self.notify_warn(txt);
+                        }
+                    },
+                    None => {
+                        tracing::error!("could not match event from watcher for {path} to ba buffer");
+                    },
+                }
+            },
         };
     }
 
@@ -634,4 +668,5 @@ pub enum Message {
     CopyLine,
     ToggleTabToSpaces,
     OpenBuffer(String),
+    FileChangedOnDisk(String),
 }

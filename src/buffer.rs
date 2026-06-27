@@ -1,6 +1,6 @@
-use std::{cell::RefCell, cmp, collections::HashMap, fs::File, io::{self, Read, Seek, Write}, os::fd::IntoRawFd, path::PathBuf, process::{self, Stdio}, rc::Rc, sync::{Arc, LazyLock, Mutex}, usize};
+use std::{cell::RefCell, cmp, collections::HashMap, fs::{self, File}, io::{self, Read, Seek, Write}, os::fd::IntoRawFd, path::PathBuf, process::{self, Stdio}, rc::Rc, sync::{Arc, LazyLock, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
-use tracing::{info, trace, warn};
+use tracing::{info, instrument, trace, warn};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use unicode_width::UnicodeWidthStr;
 use which::which;
@@ -17,7 +17,6 @@ pub static PRIVESC_CMD: LazyLock<&'static str> = LazyLock::new(|| {
     return "sudo";
 });
 
-#[derive(Debug)]
 pub struct Buffer {
     pub name: String,
     pub content: String,
@@ -42,6 +41,7 @@ pub struct Buffer {
     pub highlights: Vec<(usize, usize)>,
     pub dirty: bool,
     pub undo: UndoState,
+    pub ondisk_hash: Option<u64>,
 }
 
 fn generate_linestarts(content: &str) -> Vec<usize> {
@@ -107,9 +107,23 @@ impl Buffer {
             highlights: vec![],
             dirty: false,
             undo: UndoState::new(),
+            ondisk_hash: None,
         }
     }
 
+    pub fn calculate_ondisk_hash(&mut self) {
+        if let Some(filename) = &self.filename {
+            match fs::File::options().read(true).open(filename) {
+                Ok(mut f) => {
+                    let mut buf = vec![]; 
+                    let _ = f.read_to_end(&mut buf);
+                    self.ondisk_hash = Some(xxhash_rust::xxh3::xxh3_64(&buf));
+                },
+                Err(e) => tracing::error!("failure calculating ondisk hash for {filename} {e:?}")
+            }
+        }
+    }
+    
     /// for testing only, use new() instead
     fn empty() -> Self {
         Self::new(String::new(), None, String::new())
@@ -560,15 +574,17 @@ impl Buffer {
         }
     }
 
-    pub fn dirty(&self) -> io::Result<bool> {
+    #[instrument(skip(self))]
+    pub fn dirty(&self) -> bool {
         match &self.filename {
-            Some(file) => {
-                Ok(true)
-                // TODO restore dirty functionality
-                // best done combined with an inotify watcher
+            Some(_) => {
+                match self.ondisk_hash {
+                    Some(hash) => hash != xxhash_rust::xxh3::xxh3_64(self.content.as_bytes()),
+                    None => true,
+                }
             },
             None => {
-                Ok(!self.content.is_empty())
+                !self.content.is_empty()
             },
         }
     }

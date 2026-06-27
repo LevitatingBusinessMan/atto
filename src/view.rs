@@ -132,7 +132,7 @@ impl Model {
                             self.current_buffer().cursor.y + 1,
                             self.current_buffer().position,
                             self.current_buffer().name,
-                            if self.current_buffer().dirty().unwrap() { "+" } else { "" },
+                            if self.current_buffer().dirty() { "+" } else { "" },
                             self.selected+1, self.buffers.len(),
                         ),
                         width = self.viewport.width as usize - "Welcome to Atto! Ctrl-h for help".len() - 3

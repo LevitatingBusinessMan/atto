@@ -18,6 +18,7 @@ mod suspend;
 mod undo;
 mod clipboard;
 mod help;
+mod watcher;
 
 use logging::{setup_logging, LogError};
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};
@@ -83,7 +84,7 @@ fn main() -> anyhow::Result<()> {
     terminal.draw(|frame| model.view(frame))?;
     TERMINAL.set(Mutex::new(terminal)).unwrap();
     while model.running {
-        if let Some(msg) = handle_event(&mut event_state)? {
+        if let Some(msg) = handle_event(&mut event_state)?.or_else(|| model.inbox.try_recv().ok()) {
             model.update(msg);
             TERMINAL.get().unwrap().lock().unwrap().draw(|frame| model.view(frame))?;
         }
