@@ -1,6 +1,7 @@
 use std::{cell::RefCell, cmp, collections::HashMap, fs::{self, File}, io::{self, Read, Seek, Write}, os::fd::IntoRawFd, path::PathBuf, process::{self, Stdio}, rc::Rc, sync::{Arc, LazyLock, Mutex}, usize};
 use syntect::parsing::{SyntaxSet, SyntaxReference};
 use tracing::{info, instrument, trace, warn};
+use tracing_subscriber::field::debug;
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use unicode_width::UnicodeWidthStr;
 use which::which;
@@ -295,7 +296,6 @@ impl Buffer {
     /// move to next grapheme cluster
     pub fn move_right(&mut self) {
         if let Some((_s, b)) = self.cur_grapheme() {
-            tracing::error!("{_s} {b}");
             self.position = b;
             self.prefered_col = None;
             self.update_cursor();
@@ -365,77 +365,51 @@ impl Buffer {
         self.update_cursor();
     }
 
-    fn start_of_next_line(&self) -> Option<usize> {
-        for (index, chr) in self.content[self.position..].chars().enumerate() {
-            if chr == '\n' {
-                return Some(self.position + index + 1);
-            }
-        }
-        return None;
-    }
-
     fn start_of_line(&self) -> usize {
-        for (index, chr) in self.content[..self.position].chars().rev().enumerate() {
-            if chr == '\n' {
-                return self.position - index;
-            }
-        }
-        return 0;
+        self.linestarts[self.cursor.y]
     }
 
-    fn start_of_prev_line(&self) -> Option<usize> {
-        let start_of_line = self.start_of_line();
-        if start_of_line == 0 {
-            return None;
-        }
-        for (index, chr) in self.content[..start_of_line-1].chars().rev().enumerate() {
-            if chr == '\n' {
-                return Some(start_of_line  - 1 - index);
-            }
-        }
-        return Some(0);
+    fn end_of_line(&self) -> usize {
+        self.linestarts[self.cursor.y + 1]
     }
 
-    // TODO rewrite to match new utilities
     pub fn move_word_left(&mut self) {
-        let mut next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
-        if next.is_whitespace() {
-            while next.is_whitespace() && self.position > 0 && self.start_of_line() != self.position {
-                self.position -= 1;
-                next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
-            }
-        } else if next.is_alphanumeric() {
-            while (next.is_alphanumeric() || next == '_') && self.position > 0 && self.start_of_line() != self.position {
-                self.position -= 1;
-                next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
-            }
+        let Some((s, _)) = self.prev_grapheme() else { return };
+        let mut prev = s.chars().next().unwrap();
+        let cond: fn(char) -> bool = if prev.is_whitespace() {
+            |c: char| c.is_whitespace()
+        } else if prev.is_alphanumeric() {
+            |c: char| c.is_alphanumeric() || c == '_'
         } else {
-            while !next.is_alphanumeric()  && !next.is_whitespace() && self.position > 0 && self.start_of_line() != self.position {
-                self.position -= 1;
-                next = self.content.chars().nth(self.position.saturating_sub(1)).unwrap();
-            }
+            |c: char| !c.is_alphanumeric() && !c.is_whitespace()
+        };
+        let end_of_prev_line = self.linestarts[self.cursor.y].saturating_sub(1);
+        while cond(prev) && self.position >= end_of_prev_line {
+            self.move_left();
+            let Some((s, _)) = self.prev_grapheme() else { break };
+            prev = s.chars().next().unwrap();
         }
         self.prefered_col = None;
         self.update_cursor();
     }
 
-    // TODO rewrite to match new utilities
     pub fn move_word_right(&mut self) {
-        if self.current_char().is_whitespace() {
-            while self.current_char().is_whitespace() && self.position+1 != self.content.len() && self.current_char() != '\n' {
-                self.position += 1;
-            }
-        } else if self.current_char().is_alphanumeric() {
-            while (self.current_char().is_alphanumeric() || self.current_char() == '_') && self.position+1 != self.content.len() {
-                self.position += 1;
-            }
+        let Some((s, _)) = self.cur_grapheme() else { return };
+        let mut next = s.chars().next().unwrap();
+        let cond = if next.is_whitespace() {
+            |c: char| c.is_whitespace()
+        } else if next.is_alphanumeric() {
+            |c: char| c.is_alphanumeric() || c == '_'
         } else {
-            while !self.current_char().is_alphanumeric()  && !self.current_char().is_whitespace() && self.position+1 != self.content.len() {
-                self.position += 1;
-            }
+            |c: char| !c.is_alphanumeric() && !c.is_whitespace()
+        };
+        while cond(next) {
+            self.move_right();
+            let Some((s, _)) = self.cur_grapheme() else { break };
+            next = s.chars().next().unwrap();
         }
         self.prefered_col = None;
-        self.update_cursor();;
+        self.update_cursor();
     }
 
     pub fn goto_start_of_line(&mut self) {
@@ -450,8 +424,8 @@ impl Buffer {
         self.update_position();
     }
 
-    fn current_char(&self) -> char {
-        return self.content.chars().nth(self.position).unwrap();
+    fn current_char(&self) -> Option<char> {
+        return self.content.chars().nth(self.position);
     }
 
     /// find a query through the buffer, set highlights field and return count

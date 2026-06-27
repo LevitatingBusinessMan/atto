@@ -632,7 +632,7 @@ pub enum Message {
     Paste(String),
     PasteClipboard,
     OpenShell,
-    /// Two messages
+    /// Two messages, execute second if first did not set last_error
     Double(Box<Message>, Box<Message>),
     SaveAsRootConfirmation,
     SaveAsRoot,
