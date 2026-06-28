@@ -114,7 +114,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Char('q') => Some(Message::Quit),
                 KeyCode::Char('s') => Some(Message::Save),
                 KeyCode::Char('S') => Some(Message::SaveAsRootConfirmation),
-                KeyCode::Char('h') => Some(Message::OpenHelp),
+                KeyCode::Char('h') => Some(Message::OpenHelpBuffer),
                 KeyCode::Char('f') => Some(Message::OpenFind),
                 KeyCode::Char('b') => Some(Message::OpenShell),
                 KeyCode::Char('z') => Some(Message::Suspend),
@@ -126,6 +126,7 @@ fn handle_key(key: event::KeyEvent, state: &mut EventState) -> Option<Message> {
                 KeyCode::Char('c') => Some(Message::CopyLine),
                 KeyCode::Char('d') => Some(Message::DeleteLine),
                 KeyCode::Tab => Some(Message::ToggleTabToSpaces),
+                KeyCode::Backspace => Some(Message::DeleteWordLeft),
                 _ => None,
             }
         } else {

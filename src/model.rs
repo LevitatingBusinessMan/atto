@@ -528,6 +528,12 @@ impl Model {
                     },
                 }
             },
+            Message::DeleteWordLeft => {
+                let before = self.current_buffer().position;
+                let removed = self.current_buffer_mut().delete_word_left();
+                let after = self.current_buffer().position;
+                self.current_buffer_mut().undo.record(before,after, msg, Message::Paste(removed));
+            },
         };
     }
 
@@ -671,4 +677,5 @@ pub enum Message {
     ToggleTabToSpaces,
     OpenBuffer(String),
     FileChangedOnDisk(String),
+    DeleteWordLeft,
 }

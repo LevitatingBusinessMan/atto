@@ -620,6 +620,13 @@ impl Buffer {
         }
     }
 
+    /// the action you'd expect from ctrl-backspace
+    pub fn delete_word_left(&mut self) -> String {
+        let old = self.position;
+        self.move_word_left();
+        self.drain(self.position..old)
+    }
+
     /// Drain a range from the buffer, return removed
     pub fn drain<R>(&mut self, range: R) -> String where R:  std::ops::RangeBounds<usize> {
         let removed = self.content.drain(range).collect();
