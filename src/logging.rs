@@ -42,23 +42,10 @@ pub fn setup_logging(args: &crate::Args) -> io::Result<()> {
         )
     };
 
-    let pipe_layer = nix::unistd::pipe().ok().and_then(|(pipe_read, pipe_write)| {
-        nix::unistd::dup2(pipe_read.as_raw_fd(), 100).ok()?;
-        let fd_file = unsafe { fs::File::from_raw_fd(pipe_write.into_raw_fd()) };
-        let layer = tracing_subscriber::fmt::layer()
-            .with_line_number(true)
-            .with_writer(fd_file)
-            .with_target(true)
-            .with_ansi(true)
-            .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE);
-        Some(layer)
-    });
-    
     let subscriber = Registry::default()
         .with(env)
         .with(syslog_layer)
-        .with(file_layer)
-        .with(pipe_layer);
+        .with(file_layer);
 
     let _ = tracing::subscriber::set_global_default(subscriber);
 
