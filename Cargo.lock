@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "atto"
-version = "1.11.3"
+version = "1.11.4"
 dependencies = [
  "anyhow",
  "arboard",
